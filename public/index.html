@@ -185,6 +185,61 @@
   #toast.err{border-color:var(--danger);color:#fca5a5}
   #toast.ok{border-color:var(--success);color:#6ee7b7}
   audio{display:none}
+  .icon-btn.ed:hover{color:#7dd3fc;border-color:rgba(125,211,252,.4);background:rgba(125,211,252,.1)}
+
+  /* activity list */
+  .act-row{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--border);font-size:13px}
+  .act-row:last-child{border-bottom:none}
+  .act-ev{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:6px;flex:0 0 auto}
+  .act-ev.push{color:var(--accent);background:rgba(167,139,250,.14);border:1px solid rgba(167,139,250,.3)}
+  .act-ev.commit{color:var(--success);background:rgba(16,185,129,.13);border:1px solid rgba(16,185,129,.3)}
+  .act-row .ar-repo{font-weight:600}
+  .act-row .ar-tag{color:var(--textMuted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .act-row .ar-when{margin-left:auto;color:var(--textMuted);font-size:11.5px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .act-empty{color:var(--textMuted);font-size:13px;text-align:center;padding:14px 0}
+
+  /* audio editor overlay */
+  .editor-bg{position:fixed;inset:0;background:rgba(5,5,8,.72);backdrop-filter:blur(4px);display:flex;align-items:center;
+    justify-content:center;padding:18px;z-index:65;opacity:0;pointer-events:none;transition:.2s}
+  .editor-bg.show{opacity:1;pointer-events:auto}
+  .editor{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;width:100%;max-width:560px;
+    max-height:92vh;overflow-y:auto;transform:scale(.97);transition:.2s;box-shadow:0 28px 70px rgba(0,0,0,.62)}
+  .editor-bg.show .editor{transform:scale(1)}
+  .editor-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .etitle{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:700}
+  .etitle svg{width:17px;height:17px;color:var(--accent)}
+  .etitle span{color:var(--accent)}
+
+  .wave-wrap{position:relative;height:96px;background:var(--surfaceElevated);border:1px solid var(--border);border-radius:12px;overflow:hidden;touch-action:none;user-select:none}
+  .wave-wrap canvas{display:block;width:100%;height:100%}
+  .shade{position:absolute;top:0;bottom:0;background:rgba(5,5,8,.6);pointer-events:none}
+  #shadeL{left:0;width:0}
+  #shadeR{right:0;width:0}
+  .handle{position:absolute;top:0;bottom:0;width:14px;margin-left:-7px;cursor:ew-resize;display:flex;align-items:center;justify-content:center}
+  .handle::before{content:'';width:3px;height:100%;background:var(--accent);box-shadow:0 0 8px rgba(167,139,250,.6)}
+  .handle::after{content:'';position:absolute;top:50%;transform:translateY(-50%);width:11px;height:26px;border-radius:4px;background:var(--accent)}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;opacity:0;pointer-events:none}
+  .ed-times{display:flex;justify-content:space-between;font-size:11.5px;color:var(--textMuted);margin:7px 2px 4px;font-variant-numeric:tabular-nums}
+  .ed-times .muted{color:var(--accent)}
+
+  .ed-section{margin-top:14px}
+  .ed-sec-label{font-size:11px;font-weight:650;text-transform:uppercase;letter-spacing:.06em;color:var(--textMuted);margin-bottom:8px}
+  .ed-section .seg{display:inline-flex;width:100%}
+  .ed-section .seg button{flex:1;justify-content:center}
+
+  .ed-grid{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:13px 16px}
+  .ed-ctl{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--textMuted)}
+  .ed-ctl span b{color:var(--textPrimary);font-variant-numeric:tabular-nums}
+  .ed-ctl input[type=range]{width:100%}
+  .ed-toggles{grid-column:1/-1;display:flex;gap:10px}
+  .chip{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--border);background:var(--surfaceElevated);
+    color:var(--textPrimary);font-size:13px;font-weight:600;padding:10px;border-radius:10px;cursor:pointer;transition:.14s;font-family:inherit}
+  .chip svg{width:15px;height:15px}
+  .chip.on{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+  .chip:not(.on):hover{background:var(--surfaceHover)}
+
+  .ed-actions{margin-top:18px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .ed-actions .btn{padding:10px 13px}
 </style>
 </head>
 <body>
@@ -306,18 +361,32 @@
       <label class="switch"><input type="checkbox" id="commitToggle"><span class="track"></span><span class="thumb"></span></label>
     </div>
     <div class="row">
-      <div><div class="label">Volume</div><div class="sub">Applied by afplay when the tag fires</div></div>
+      <div><div class="label">Volume</div><div class="sub">Applied when the tag fires</div></div>
       <div style="display:flex;align-items:center;gap:12px">
         <input type="range" id="volRange" min="0" max="2" step="0.05" value="1">
         <span class="vol-val" id="volVal">100%</span>
       </div>
     </div>
+    <div class="row">
+      <div><div class="label">Desktop notification</div><div class="sub">Show a banner when the tag fires (macOS / Windows / Linux)</div></div>
+      <label class="switch"><input type="checkbox" id="notifyToggle"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="card" id="activityCard">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Recent activity <span class="count" id="playCount">0</span>
+    </h2>
+    <div id="activityList"></div>
   </div>
 
   <div class="hint">
-    Git hooks (<code>post-commit</code>, <code>pre-push</code>) read <code>~/.producer-tag/config.json</code> and play the
-    active tag in the background &mdash; they never block git. Install them in any repo with
-    <code>bash install.sh</code> from the producer-tag folder.
+    Installed across your repos via global git hooks. Each commit/push reads
+    <code>~/.producer-tag/config.json</code> and plays in the background &mdash; it never blocks git.
+    Don't see a play above after a push? The repo may set its own <code>core.hooksPath</code>; run
+    <code>bash install.sh</code> in it.
   </div>
 </div>
 
@@ -330,6 +399,57 @@
     <div class="acts">
       <button class="btn ghost" id="modalCancel">Cancel</button>
       <button class="btn primary" id="modalOk">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- audio editor -->
+<div class="editor-bg" id="editorBg">
+  <div class="editor">
+    <div class="editor-head">
+      <div class="etitle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> Edit <span id="edName"></span></div>
+      <button class="icon-btn" id="edClose" title="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <div class="wave-wrap" id="waveWrap">
+      <canvas id="waveCanvas"></canvas>
+      <div class="shade" id="shadeL"></div>
+      <div class="shade" id="shadeR"></div>
+      <div class="handle" id="trimA"></div>
+      <div class="handle" id="trimB"></div>
+      <div class="playhead" id="playhead"></div>
+    </div>
+    <div class="ed-times"><span id="edStart">0:00</span><span class="muted" id="edSel">full clip</span><span id="edEnd">0:00</span></div>
+
+    <div class="ed-section">
+      <div class="ed-sec-label">Autotune</div>
+      <div class="seg" id="edAutoSeg">
+        <button data-at="" class="on">Off</button>
+        <button data-at="subtle">Subtle</button>
+        <button data-at="hard">Hard</button>
+        <button data-at="chipmunk">Chipmunk</button>
+      </div>
+    </div>
+
+    <div class="ed-grid">
+      <label class="ed-ctl"><span>Pitch <b id="vPitch">0</b> st</span><input type="range" id="edPitch" min="-12" max="12" step="1" value="0"></label>
+      <label class="ed-ctl"><span>Speed <b id="vSpeed">1.0</b>×</span><input type="range" id="edSpeed" min="0.5" max="2" step="0.05" value="1"></label>
+      <label class="ed-ctl"><span>Gain <b id="vGain">0</b> dB</span><input type="range" id="edGain" min="-12" max="12" step="1" value="0"></label>
+      <label class="ed-ctl"><span>Fade in <b id="vFadeIn">0.0</b>s</span><input type="range" id="edFadeIn" min="0" max="2" step="0.1" value="0"></label>
+      <label class="ed-ctl"><span>Fade out <b id="vFadeOut">0.0</b>s</span><input type="range" id="edFadeOut" min="0" max="2" step="0.1" value="0"></label>
+      <div class="ed-toggles">
+        <button class="chip" id="edReverse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg> Reverse</button>
+        <button class="chip" id="edReverb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2l2-6 4 14 3-9 2 5h7"/></svg> Reverb</button>
+      </div>
+    </div>
+
+    <div class="ed-actions">
+      <button class="btn" id="edPlayOrig"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg> Original</button>
+      <button class="btn" id="edPreview"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg> Preview edit</button>
+      <button class="btn ghost" id="edReset">Reset</button>
+      <span style="flex:1"></span>
+      <button class="btn" id="edReplace">Replace</button>
+      <button class="btn primary" id="edSaveNew">Save as new</button>
     </div>
   </div>
 </div>
@@ -380,6 +500,7 @@ function render(){
   // triggers + volume
   $('pushToggle').checked = !!(state.events&&state.events.push);
   $('commitToggle').checked = !!(state.events&&state.events.commit);
+  $('notifyToggle').checked = state.notify !== false;
   $('volRange').value = state.volume!=null?state.volume:1;
   $('volVal').textContent = Math.round((state.volume!=null?state.volume:1)*100)+'%';
   $('triggerCard').classList.toggle('dim', !state.enabled);
@@ -451,6 +572,7 @@ function renderList(){
       '<div class="acts">'+
         '<button class="icon-btn at" data-act="autotune" title="Autotune — adds a tuned copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3l1.9 4.6L19.5 9l-4.6 1.9L13 15.5l-1.9-4.6L6.5 9l4.6-1.4L13 3z"/><path d="M5 14v4M3 16h4M18 15v3M16.5 16.5h3"/></svg></button>'+
         '<button class="icon-btn'+(t.skipRandom?' skipped':'')+'" data-act="skip" title="'+(t.skipRandom?'Excluded from Random — click to include':'In Random — click to exclude')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>'+
+        '<button class="icon-btn ed" data-act="edit" title="Edit audio — trim, effects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></button>'+
         '<button class="icon-btn" data-act="rename" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
         '<button class="icon-btn del" data-act="delete" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
       '</div></div>';
@@ -464,6 +586,7 @@ function renderList(){
         else if(a==='play') previewTag(id, false);
         else if(a==='autotune') autotuneTag(id, b);
         else if(a==='skip') toggleSkip(id);
+        else if(a==='edit') openEditor(id);
         else if(a==='rename') renameTag(id);
         else if(a==='delete') deleteTag(id);
       };
@@ -534,6 +657,7 @@ async function postConfig(patch){
 $('enabledToggle').addEventListener('change', e=>{ postConfig({enabled:e.target.checked}); toast(e.target.checked?'Producer tag ON':'Producer tag OFF','ok'); });
 $('pushToggle').addEventListener('change', e=> postConfig({events:{push:e.target.checked}}) );
 $('commitToggle').addEventListener('change', e=> postConfig({events:{commit:e.target.checked}}) );
+$('notifyToggle').addEventListener('change', e=> postConfig({notify:e.target.checked}) );
 let volT;
 $('volRange').addEventListener('input', e=>{ $('volVal').textContent=Math.round(e.target.value*100)+'%'; clearTimeout(volT); volT=setTimeout(()=>postConfig({volume:parseFloat(e.target.value)}),300); });
 $('modeSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
@@ -632,6 +756,142 @@ function encodeWAV(samples, sampleRate){
   return buffer;
 }
 
+// ---------- activity feed ----------
+function ago(ts){ if(!ts) return ''; const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
+async function loadHistory(){
+  let d; try{ d=await (await fetch(API+'/history')).json(); }catch(e){ return; }
+  $('playCount').textContent = d.count||0;
+  const list = $('activityList');
+  if(!d.plays||!d.plays.length){ list.innerHTML='<div class="act-empty">No plays yet. Push to a repo with the hooks installed and it shows up here.</div>'; return; }
+  list.innerHTML = d.plays.map(p=>{
+    const ev=(p.event==='push')?'push':'commit';
+    return '<div class="act-row"><span class="act-ev '+ev+'">'+ev+'</span>'+
+      '<span class="ar-repo">'+esc(p.repo||'?')+'</span>'+
+      '<span class="ar-tag">'+esc(p.tag||'')+'</span>'+
+      '<span class="ar-when">'+ago(p.ts)+'</span></div>';
+  }).join('');
+}
+setInterval(loadHistory, 8000);
+
+// ========================= AUDIO EDITOR =========================
+const ed = { id:null, dur:0, peaks:null, a:0, b:1, autotune:'', reverse:false, reverb:false, drag:null, audio:new Audio() };
+function fmtT(s){ if(!isFinite(s)) return '0:00'; const m=Math.floor(s/60), ss=Math.floor(s%60), d=Math.floor((s%1)*10); return m+':'+String(ss).padStart(2,'0')+'.'+d; }
+
+async function openEditor(id){
+  const t = state.tags.find(x=>x.id===id); if(!t) return;
+  ed.id=id; $('edName').textContent=t.name;
+  $('editorBg').classList.add('show');
+  ed.dur=0; ed.peaks=null;
+  try{
+    const buf = await (await fetch(API+'/sound?id='+encodeURIComponent(id)+'&t='+Date.now())).arrayBuffer();
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const audioBuf = await ctx.decodeAudioData(buf.slice(0));
+    ed.dur = audioBuf.duration; ed.peaks = computePeaks(audioBuf, 600);
+    ctx.close();
+  }catch(e){ toast('Could not load audio','err'); }
+  resetEditor();
+  drawWave();
+}
+function closeEditor(){ $('editorBg').classList.remove('show'); try{ed.audio.pause();}catch(e){} }
+function resetEditor(){
+  ed.a=0; ed.b=ed.dur||1; ed.autotune=''; ed.reverse=false; ed.reverb=false;
+  $('edPitch').value=0; $('edSpeed').value=1; $('edGain').value=0; $('edFadeIn').value=0; $('edFadeOut').value=0;
+  syncCtlLabels();
+  $('edReverse').classList.remove('on'); $('edReverb').classList.remove('on');
+  $('edAutoSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.at===''));
+  layoutTrim(); updateTimes();
+}
+function computePeaks(audioBuf, n){
+  const ch = audioBuf.getChannelData(0); const block = Math.floor(ch.length/n)||1; const out=[];
+  for(let i=0;i<n;i++){ let max=0; const s=i*block; for(let j=0;j<block;j++){ const v=Math.abs(ch[s+j]||0); if(v>max) max=v; } out.push(max); }
+  return out;
+}
+function drawWave(){
+  const c=$('waveCanvas'), wrap=$('waveWrap'); const W=wrap.clientWidth, H=wrap.clientHeight, dpr=window.devicePixelRatio||1;
+  c.width=W*dpr; c.height=H*dpr; const g=c.getContext('2d'); g.scale(dpr,dpr); g.clearRect(0,0,W,H);
+  if(!ed.peaks) return;
+  const n=ed.peaks.length, bw=W/n, mid=H/2;
+  for(let i=0;i<n;i++){ const h=Math.max(1, ed.peaks[i]*(H*0.92)); const grad=g.createLinearGradient(0,mid-h/2,0,mid+h/2);
+    grad.addColorStop(0,'#a78bfa'); grad.addColorStop(1,'#7c5cf0'); g.fillStyle=grad; g.globalAlpha=.85;
+    g.fillRect(i*bw, mid-h/2, Math.max(1,bw*0.7), h); }
+  g.globalAlpha=1;
+}
+function layoutTrim(){
+  const W=$('waveWrap').clientWidth, d=ed.dur||1;
+  const xa=Math.round(ed.a/d*W), xb=Math.round(ed.b/d*W);
+  $('trimA').style.left=xa+'px'; $('trimB').style.left=xb+'px';
+  $('shadeL').style.width=xa+'px'; $('shadeR').style.width=Math.max(0,W-xb)+'px';
+}
+function updateTimes(){
+  $('edStart').textContent=fmtT(ed.a); $('edEnd').textContent=fmtT(ed.dur);
+  const trimmed=(ed.a>0.02)||(ed.b<ed.dur-0.02);
+  $('edSel').textContent = trimmed ? ('selection '+fmtT(ed.a)+'–'+fmtT(ed.b)) : 'full clip';
+}
+['trimA','trimB'].forEach(id=>{
+  const h=$(id), which=id==='trimA'?'a':'b';
+  h.addEventListener('pointerdown', e=>{ h.setPointerCapture(e.pointerId); ed.drag=which; e.preventDefault(); });
+});
+$('waveWrap').addEventListener('pointermove', e=>{
+  if(!ed.drag) return; const r=$('waveWrap').getBoundingClientRect();
+  let x=Math.max(0,Math.min(r.width, e.clientX-r.left)); let tm=x/r.width*(ed.dur||1);
+  if(ed.drag==='a') ed.a=Math.min(tm, ed.b-0.05); else ed.b=Math.max(tm, ed.a+0.05);
+  ed.a=Math.max(0,ed.a); ed.b=Math.min(ed.dur,ed.b); layoutTrim(); updateTimes();
+});
+window.addEventListener('pointerup', ()=>{ ed.drag=null; });
+
+function syncCtlLabels(){
+  $('vPitch').textContent=$('edPitch').value;
+  $('vSpeed').textContent=parseFloat($('edSpeed').value).toFixed(2);
+  $('vGain').textContent=$('edGain').value;
+  $('vFadeIn').textContent=parseFloat($('edFadeIn').value).toFixed(1);
+  $('vFadeOut').textContent=parseFloat($('edFadeOut').value).toFixed(1);
+}
+['edPitch','edSpeed','edGain','edFadeIn','edFadeOut'].forEach(id=> $(id).addEventListener('input', syncCtlLabels));
+$('edReverse').addEventListener('click', ()=>{ ed.reverse=!ed.reverse; $('edReverse').classList.toggle('on',ed.reverse); });
+$('edReverb').addEventListener('click', ()=>{ ed.reverb=!ed.reverb; $('edReverb').classList.toggle('on',ed.reverb); });
+$('edAutoSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+  ed.autotune=b.dataset.at; $('edAutoSeg').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b));
+}));
+$('edClose').addEventListener('click', closeEditor);
+$('editorBg').addEventListener('click', e=>{ if(e.target===$('editorBg')) closeEditor(); });
+$('edReset').addEventListener('click', resetEditor);
+
+function gatherEffects(){
+  const e={ reverse:ed.reverse, reverb:ed.reverb };
+  if(ed.a>0.02) e.trimStart=+ed.a.toFixed(3);
+  if(ed.b<ed.dur-0.02) e.trimEnd=+ed.b.toFixed(3);
+  if(ed.autotune) e.autotune=ed.autotune;
+  else { const p=parseInt($('edPitch').value,10); if(p) e.pitch=p; }
+  const sp=parseFloat($('edSpeed').value); if(sp!==1) e.speed=sp;
+  const g=parseInt($('edGain').value,10); if(g) e.gain=g;
+  const fi=parseFloat($('edFadeIn').value); if(fi>0) e.fadeIn=fi;
+  const fo=parseFloat($('edFadeOut').value); if(fo>0) e.fadeOut=fo;
+  return e;
+}
+$('edPlayOrig').addEventListener('click', ()=>{ const a=ed.audio; a.src=API+'/sound?id='+encodeURIComponent(ed.id)+'&t='+Date.now(); a.play().catch(()=>toast('Could not play','err')); });
+$('edPreview').addEventListener('click', async ()=>{
+  const btn=$('edPreview'); btn.disabled=true; toast('Rendering preview…');
+  try{
+    const r=await fetch(API+'/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:ed.id,save:'preview',effects:gatherEffects()})});
+    if(!r.ok){ const d=await r.json().catch(()=>({})); toast(d.error||'Preview failed','err'); return; }
+    const blob=await r.blob(); ed.audio.src=URL.createObjectURL(blob); ed.audio.play().catch(()=>toast('Could not play preview','err'));
+  }catch(e){ toast('Preview failed','err'); } finally{ btn.disabled=false; }
+});
+async function saveEdit(mode){
+  const btn = mode==='replace'?$('edReplace'):$('edSaveNew'); btn.disabled=true;
+  try{
+    const r=await fetch(API+'/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:ed.id,save:mode,effects:gatherEffects()})});
+    const d=await r.json();
+    if(d.ok){ if(d.tags) state=d; toast(mode==='replace'?'Tag replaced':'Saved as new tag','ok'); await load(); closeEditor(); }
+    else toast(d.error||'Save failed','err');
+  }catch(e){ toast('Save failed','err'); } finally{ btn.disabled=false; }
+}
+$('edSaveNew').addEventListener('click', ()=>saveEdit('new'));
+$('edReplace').addEventListener('click', ()=>saveEdit('replace'));
+window.addEventListener('resize', ()=>{ if($('editorBg').classList.contains('show')){ drawWave(); layoutTrim(); } });
+
+loadHistory();
 load();
 </script>
 </body>

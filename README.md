@@ -5,8 +5,9 @@ Drop your signature sound — DJ-style — every time you push to git.
 Record a short audio tag (your name, a catchphrase, an air horn, whatever), and
 it plays on your machine whenever you commit or push. Manage a whole **library**
 of tags from a little web control panel, pick which one is active, shuffle them
-at random, or run them through a built-in **autotune** (including a very silly
-chipmunk mode).
+at random, **edit them** (trim + effects), or run them through a built-in
+**autotune** (including a very silly chipmunk mode). A **Recent activity** feed
+and optional **desktop notifications** show you exactly when and where it fired.
 
 It's purely local and just for fun. The git hooks run in the background and
 **always exit 0**, so they can never block, slow, or fail a commit or push.
@@ -15,10 +16,11 @@ It's purely local and just for fun. The git hooks run in the background and
 
 ## Requirements
 
-- **macOS** — playback uses the built-in `afplay`.
 - **Node.js** ≥ 14 — for the control panel server (no npm dependencies).
-- **Optional, for autotune:** `ffmpeg` (built with `rubberband`) and `python3`
-  with `numpy`. Everything else works without them.
+- **Playback:** macOS (`afplay`, built in) · Windows (PowerShell, via Git Bash)
+  · Linux (`paplay`/`aplay`/`ffplay`).
+- **Optional, for autotune + the audio editor:** `ffmpeg` (built with
+  `rubberband`) and `python3` with `numpy`. Everything else works without them.
 
 ## Quick start
 
@@ -29,12 +31,15 @@ npm start
 
 # 2. In the browser: record or upload a tag, hit Test to hear it.
 
-# 3. Install the hooks into a repo you want it to fire on:
+# 3a. Install GLOBALLY — fires in every repo on your machine:
+bash install.sh --global
+
+# 3b. …or install into one repo:
 bash install.sh /path/to/your/repo
-#   (or just `bash install.sh` from inside that repo)
 ```
 
-That's it. Next time you `git push` in that repo, your tag drops.
+That's it. Next time you `git push`, your tag drops. Global install chains to each
+repo's own hooks, so anything you already had keeps working.
 
 Change the port with `PORT=8080 npm start`. Sounds and settings are stored in
 `~/.producer-tag/` (override with `PRODUCER_TAG_HOME`).
@@ -52,8 +57,15 @@ Change the port with `PORT=8080 npm start`. Sounds and settings are stored in
   - **Subtle** — gentle tune + light shimmer.
   - **Hard** — heavy T-Pain-style tune.
   - **Chipmunk** — funny super-pitched voice.
+- **Audio editor** — a waveform with drag handles to **trim/cut**, plus pitch,
+  speed, gain, fade in/out, reverse, and reverb. Preview the result, then save as
+  a new tag or replace the original.
+- **Recent activity** — a live feed of every play: which repo, push or commit, and
+  when. So you always know it's working.
+- **Desktop notifications** — optional banner each time the tag fires.
 
-  Autotuning creates a *new* tag, so your original is never touched.
+  Autotune and edits create a *new* tag (unless you pick Replace), so your
+  original is never touched.
 
 ## How it works
 

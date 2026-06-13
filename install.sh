@@ -1,17 +1,46 @@
 #!/usr/bin/env bash
-# Producer Tag — install the git hooks into a repository.
+# Producer Tag — install the git hooks.
 #
-#   bash install.sh [path-to-repo]      (defaults to the current directory)
+#   bash install.sh [path-to-repo]   install into one repo (default: current dir)
+#   bash install.sh --global         install GLOBALLY → fires in EVERY repo
 #
 # Safe & idempotent:
 #   - respects an existing core.hooksPath
 #   - if a post-commit / pre-push hook already exists, it is preserved as
 #     <hook>.local and still runs first (its exit code is honored, so a
 #     blocking pre-push keeps blocking) — then the producer tag plays.
+#   - global mode also chains to each repo's own .git/hooks, so local hooks keep working.
 #   - re-running install does nothing harmful.
 set -e
 
 SRC="$(cd "$(dirname "$0")" && pwd)"
+DATA="${PRODUCER_TAG_HOME:-$HOME/.producer-tag}"
+
+# ── global install: every repo on this machine ──────────────────────────────
+if [ "$1" = "--global" ]; then
+  GHOOKS="$DATA/hooks"
+  mkdir -p "$GHOOKS"
+  cp "$SRC/hooks/producer-tag-play.sh" "$GHOOKS/producer-tag-play.sh"
+  chmod +x "$GHOOKS/producer-tag-play.sh"
+  for pair in "post-commit:commit" "pre-push:push"; do
+    name="${pair%%:*}"; event="${pair##*:}"
+    cat > "$GHOOKS/$name" <<EOF
+#!/usr/bin/env bash
+# Global Producer Tag hook. Also runs this repo's own .git/hooks/$name (local hooks keep working).
+DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+LOCAL="\$(git rev-parse --git-dir 2>/dev/null)/hooks/$name"
+if [ -x "\$LOCAL" ] && [ "\$LOCAL" != "\$DIR/$name" ]; then "\$LOCAL" "\$@" || exit \$?; fi
+bash "\$DIR/producer-tag-play.sh" $event
+exit 0
+EOF
+    chmod +x "$GHOOKS/$name"
+  done
+  git config --global core.hooksPath "$GHOOKS"
+  echo "✓ Producer Tag installed GLOBALLY (git core.hooksPath = $GHOOKS)"
+  echo "  It now fires in every repo. Undo with: git config --global --unset core.hooksPath"
+  exit 0
+fi
+
 REPO="${1:-$PWD}"
 
 if ! git -C "$REPO" rev-parse --git-dir >/dev/null 2>&1; then

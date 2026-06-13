@@ -50,6 +50,7 @@ function normalize(raw) {
     enabled: raw.enabled !== false,                 // default ON
     volume: Math.max(0, Math.min(2, Number(raw.volume) || 1.0)),
     mode: raw.mode === 'random' ? 'random' : 'fixed',
+    notify: raw.notify !== false,                   // desktop notification; default ON
     events: { commit: !!(raw.events && raw.events.commit), push: raw.events ? !!raw.events.push : true },
     active: raw.active != null ? String(raw.active) : null,
     tags: [],
@@ -79,7 +80,7 @@ function write(cfg) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const a = activeTag(cfg);
   fs.writeFileSync(CFG_FILE, JSON.stringify({
-    enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, events: cfg.events,
+    enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
     active: cfg.active, sound: a ? a.file : '',
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, file: t.file, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   }, null, 2));
@@ -87,7 +88,7 @@ function write(cfg) {
 function pub(cfg) {
   const a = activeTag(cfg);
   return {
-    ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, events: cfg.events,
+    ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
     active: cfg.active, hasSound: !!a, soundSize: a ? a.size : 0,
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   };
@@ -101,6 +102,7 @@ async function postConfig(req, res) {
   if (!b || typeof b !== 'object') return json(res, { error: 'invalid body' }, 400);
   const cfg = normalize(readRaw());
   if (typeof b.enabled === 'boolean') cfg.enabled = b.enabled;
+  if (typeof b.notify === 'boolean') cfg.notify = b.notify;
   if (b.volume != null) cfg.volume = Math.max(0, Math.min(2, Number(b.volume) || 1.0));
   if (b.mode != null) cfg.mode = b.mode === 'random' ? 'random' : 'fixed';
   if (b.events) {
@@ -134,14 +136,34 @@ async function postSound(req, res) {
   } catch (e) { json(res, { error: 'write failed: ' + e.message }, 500); }
 }
 
+// Serve audio WITH HTTP Range support — Safari's <audio> requires a 206 or it
+// refuses to play ("Could not play preview"). Chrome is lenient; Safari is not.
+function serveAudio(req, res, p, mime) {
+  let stat; try { stat = fs.statSync(p); } catch { return json(res, { error: 'missing file' }, 404); }
+  const total = stat.size;
+  const base = { 'Content-Type': mime, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' };
+  const range = req.headers.range;
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(range);
+    let start = m && m[1] ? parseInt(m[1], 10) : 0;
+    let end = m && m[2] ? parseInt(m[2], 10) : total - 1;
+    if (isNaN(start)) start = 0;
+    if (isNaN(end) || end >= total) end = total - 1;
+    if (start > end || start >= total) { res.writeHead(416, { 'Content-Range': `bytes */${total}` }); return res.end(); }
+    res.writeHead(206, { ...base, 'Content-Range': `bytes ${start}-${end}/${total}`, 'Content-Length': end - start + 1 });
+    return fs.createReadStream(p, { start, end }).pipe(res);
+  }
+  res.writeHead(200, { ...base, 'Content-Length': total });
+  fs.createReadStream(p).pipe(res);
+}
+
 function getSound(req, res, query) {
   const cfg = normalize(readRaw());
   const tag = query.id ? cfg.tags.find((t) => t.id === String(query.id)) : activeTag(cfg);
   if (!tag) return json(res, { error: 'no sound' }, 404);
   const p = path.join(DATA_DIR, tag.file);
   if (!fs.existsSync(p)) return json(res, { error: 'missing file' }, 404);
-  res.writeHead(200, { 'Content-Type': MIME[tag.ext] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
-  fs.createReadStream(p).pipe(res);
+  serveAudio(req, res, p, MIME[tag.ext] || 'application/octet-stream');
 }
 
 async function postActive(req, res) {
@@ -271,6 +293,129 @@ except Exception:
   json(res, { ok: true, id: outId, name, style, ratio: Number(ratio), ...pub(cfg) });
 }
 
+// GET /api/history — recent plays logged by the git hook
+function getHistory(req, res) {
+  const cfg = normalize(readRaw());
+  const byFile = {}; cfg.tags.forEach((t) => { byFile[t.file] = t.name; });
+  let lines = [];
+  try { lines = fs.readFileSync(path.join(DATA_DIR, 'history.log'), 'utf8').trim().split('\n').filter(Boolean); } catch {}
+  const plays = lines.slice(-60).reverse().map((l) => {
+    const [ts, event, repo, file] = l.split('\t');
+    return { ts: (Number(ts) || 0) * 1000, event: event || '', repo: repo || '', tag: byFile[file] || file || '' };
+  });
+  json(res, { ok: true, plays, count: lines.length });
+}
+
+// binary resolution + runner (autotune/edit need ffmpeg + python)
+function bins() {
+  const HOME = os.homedir();
+  const fe = (c, f) => c.find((p) => p && fs.existsSync(p)) || f;
+  return {
+    ffmpeg: fe([process.env.FFMPEG, path.join(HOME, '.local/bin/ffmpeg'), '/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'], 'ffmpeg'),
+    python: fe(['/usr/bin/python3', path.join(HOME, '.local/bin/python3'), '/opt/homebrew/bin/python3', '/usr/local/bin/python3'], 'python3'),
+  };
+}
+function runCmd(cmd, args) {
+  const { execFile } = require('child_process');
+  return new Promise((resolve, reject) => execFile(cmd, args, { timeout: 30000, maxBuffer: 8 * 1024 * 1024 },
+    (e, o, eo) => (e ? reject(new Error(String(eo || e.message).slice(0, 300))) : resolve(String(o)))));
+}
+const DETECT_PY = `
+import sys, wave, numpy as np
+try:
+    w=wave.open(sys.argv[1],'rb'); sr=w.getframerate(); n=w.getnframes(); ch=w.getnchannels(); sw=w.getsampwidth()
+    raw=w.readframes(n); w.close()
+    dt={1:np.int8,2:np.int16,4:np.int32}.get(sw,np.int16)
+    x=np.frombuffer(raw,dtype=dt).astype(np.float64)
+    if ch>1: x=x.reshape(-1,ch).mean(axis=1)
+    if x.size<256: print("1.0"); sys.exit(0)
+    x=x-np.mean(x); m=np.max(np.abs(x))
+    if m>0: x=x/m
+    win=min(2048,x.size); hop=512
+    if x.size>win:
+        e=np.array([np.sum(x[i:i+win]**2) for i in range(0,x.size-win,hop)]); s=int(np.argmax(e))*hop; seg=x[s:s+win*4]
+    else: seg=x
+    seg=seg-np.mean(seg); ac=np.correlate(seg,seg,'full')[len(seg)-1:]
+    lo=max(1,int(sr/500)); hi=min(len(ac),int(sr/80))
+    if hi<=lo: print("1.0"); sys.exit(0)
+    peak=lo+int(np.argmax(ac[lo:hi])); f0=sr/peak if peak>0 else 0
+    if f0<=0: print("1.0"); sys.exit(0)
+    midi=69+12*np.log2(f0/440.0); tgt=440.0*2**((round(midi)-69)/12.0); r=tgt/f0
+    print("%.5f"%max(0.80,min(1.25,r)))
+except Exception:
+    print("1.0")
+`;
+
+// POST /api/edit — trim + effects via ffmpeg (preview | new | replace)
+async function postEdit(req, res) {
+  const body = (await readBody(req).catch(() => ({}))) || {};
+  const cfg = normalize(readRaw());
+  const src = body.id ? cfg.tags.find((t) => t.id === String(body.id)) : activeTag(cfg);
+  if (!src) return json(res, { error: 'no sound' }, 404);
+  const srcPath = path.join(DATA_DIR, src.file);
+  if (!fs.existsSync(srcPath)) return json(res, { error: 'missing file' }, 404);
+  const e = body.effects || {};
+  const save = ['preview', 'new', 'replace'].includes(body.save) ? body.save : 'preview';
+  const { ffmpeg: FFMPEG, python: PYTHON } = bins();
+
+  const filters = [];
+  const ts = Math.max(0, Number(e.trimStart) || 0);
+  const teRaw = Number(e.trimEnd);
+  const te = isFinite(teRaw) && teRaw > ts ? teRaw : null;
+  if (ts > 0 || te != null) filters.push(`atrim=start=${ts}${te != null ? `:end=${te}` : ''}`, 'asetpts=PTS-STARTPTS');
+  if (e.reverse) filters.push('areverse');
+  const style = ['subtle', 'hard', 'chipmunk'].includes(e.autotune) ? e.autotune : null;
+  if (style) {
+    let ratio = '1.0';
+    try { ratio = (await runCmd(PYTHON, ['-c', DETECT_PY, srcPath])).trim() || '1.0'; } catch {}
+    if (!/^[0-9.]+$/.test(ratio)) ratio = '1.0';
+    if (style === 'chipmunk') filters.push(`rubberband=pitch=${(Number(ratio) * Math.pow(2, 10 / 12)).toFixed(5)}:transients=crisp`, 'atempo=1.12', 'chorus=0.6:0.9:50:0.4:0.3:2');
+    else if (style === 'hard') filters.push(`rubberband=pitch=${ratio}:transients=crisp`, 'chorus=0.7:0.9:45:0.5:0.3:2.4', 'acompressor=ratio=6');
+    else filters.push(`rubberband=pitch=${ratio}:transients=crisp`, 'chorus=0.6:0.9:55:0.4:0.25:2');
+  } else {
+    const semi = Number(e.pitch) || 0;
+    if (semi) filters.push(`rubberband=pitch=${Math.pow(2, semi / 12).toFixed(5)}:transients=crisp`);
+  }
+  let speed = Number(e.speed) || 1; speed = Math.max(0.5, Math.min(2, speed));
+  if (speed !== 1) filters.push(`atempo=${speed.toFixed(3)}`);
+  const gain = Number(e.gain) || 0;
+  if (gain) filters.push(`volume=${Math.max(-30, Math.min(30, gain))}dB`);
+  if (e.reverb) filters.push('aecho=0.8:0.88:60:0.35');
+  const fi = Math.max(0, Number(e.fadeIn) || 0);
+  const fo = Math.max(0, Number(e.fadeOut) || 0);
+  if (fi > 0) filters.push(`afade=t=in:st=0:d=${fi}`);
+  if (fo > 0 && te != null) { const so = Math.max(0, (te - ts) / speed - fo); filters.push(`afade=t=out:st=${so.toFixed(3)}:d=${fo}`); }
+  filters.push('alimiter=limit=0.95');
+
+  const outId = 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const outFile = 'tag_' + outId + '.wav';
+  const outPath = path.join(DATA_DIR, outFile);
+  try { await runCmd(FFMPEG, ['-y', '-i', srcPath, '-af', filters.join(','), '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le', outPath]); }
+  catch (err) { try { fs.unlinkSync(outPath); } catch {} return json(res, { error: 'edit failed (need ffmpeg): ' + err.message }, 501); }
+  let size = 0; try { size = fs.statSync(outPath).size; } catch {}
+  if (!size) { try { fs.unlinkSync(outPath); } catch {} return json(res, { error: 'edit produced empty file' }, 500); }
+
+  if (save === 'preview') {
+    res.writeHead(200, { 'Content-Type': 'audio/wav', 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*', 'Content-Length': size });
+    const stream = fs.createReadStream(outPath);
+    stream.pipe(res);
+    stream.on('close', () => { try { fs.unlinkSync(outPath); } catch {} });
+    return;
+  }
+  if (save === 'replace') {
+    const t = cfg.tags.find((x) => x.id === src.id);
+    try { if (t.file !== outFile) fs.unlinkSync(path.join(DATA_DIR, t.file)); } catch {}
+    t.file = outFile; t.ext = 'wav'; t.size = size; cfg.active = t.id;
+    try { write(cfg); } catch (err) { return json(res, { error: 'write failed: ' + err.message }, 500); }
+    return json(res, { ok: true, replaced: t.id, ...pub(cfg) });
+  }
+  const name = (src.name.replace(/\s*\((Autotune|Hard Tune|Chipmunk|Edit)\)\s*$/i, '') + ' (Edit)').slice(0, 60);
+  cfg.tags.push({ id: outId, name, file: outFile, ext: 'wav', size, createdAt: Date.now(), skipRandom: false });
+  cfg.active = outId;
+  try { write(cfg); } catch (err) { return json(res, { error: 'write failed: ' + err.message }, 500); }
+  json(res, { ok: true, id: outId, ...pub(cfg) });
+}
+
 async function postTest(req, res) {
   const b = (await readBody(req)) || {};
   const cfg = normalize(readRaw());
@@ -317,7 +462,9 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/rename' && req.method === 'POST') return postRename(req, res);
   if (pathname === '/api/delete' && req.method === 'POST') return postDelete(req, res);
   if (pathname === '/api/skip' && req.method === 'POST') return postSkip(req, res);
+  if (pathname === '/api/history' && req.method === 'GET') return getHistory(req, res);
   if (pathname === '/api/autotune' && req.method === 'POST') return postAutotune(req, res);
+  if (pathname === '/api/edit' && req.method === 'POST') return postEdit(req, res);
   if (pathname === '/api/test' && req.method === 'POST') return postTest(req, res);
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'not found' }));
