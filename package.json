@@ -16,19 +16,20 @@
     "producer-tag",
     "afplay",
     "autotune",
+    "ffmpeg",
     "developer-fun"
   ],
+  "author": "unemployedarvin",
   "license": "MIT",
   "engines": {
     "node": ">=14"
   },
-  "os": [
-    "darwin"
-  ],
   "files": [
     "server.js",
     "public/",
     "hooks/",
-    "install.sh"
+    "install.sh",
+    "CLAUDE.md",
+    "AGENTS.md"
   ]
 }
