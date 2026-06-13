@@ -52,9 +52,13 @@ function normalize(raw) {
     mode: raw.mode === 'random' ? 'random' : 'fixed',
     notify: raw.notify !== false,                   // desktop notification; default ON
     events: { commit: !!(raw.events && raw.events.commit), push: raw.events ? !!raw.events.push : true },
+    repos: {},                                       // per-repo mute: { name: false } = silent there
     active: raw.active != null ? String(raw.active) : null,
     tags: [],
   };
+  if (raw.repos && typeof raw.repos === 'object') {
+    for (const k in raw.repos) if (raw.repos[k] === false) cfg.repos[String(k)] = false;
+  }
   const seen = new Set();
   if (Array.isArray(raw.tags)) {
     for (const t of raw.tags) {
@@ -81,6 +85,7 @@ function write(cfg) {
   const a = activeTag(cfg);
   fs.writeFileSync(CFG_FILE, JSON.stringify({
     enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
+    repos: cfg.repos,
     active: cfg.active, sound: a ? a.file : '',
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, file: t.file, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   }, null, 2));
@@ -89,6 +94,7 @@ function pub(cfg) {
   const a = activeTag(cfg);
   return {
     ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
+    repos: cfg.repos,
     active: cfg.active, hasSound: !!a, soundSize: a ? a.size : 0,
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   };
@@ -299,11 +305,29 @@ function getHistory(req, res) {
   const byFile = {}; cfg.tags.forEach((t) => { byFile[t.file] = t.name; });
   let lines = [];
   try { lines = fs.readFileSync(path.join(DATA_DIR, 'history.log'), 'utf8').trim().split('\n').filter(Boolean); } catch {}
-  const plays = lines.slice(-60).reverse().map((l) => {
+  // Show only the last 10 plays (the rest are auto-trimmed by the hook).
+  const plays = lines.slice(-10).reverse().map((l) => {
     const [ts, event, repo, file] = l.split('\t');
     return { ts: (Number(ts) || 0) * 1000, event: event || '', repo: repo || '', tag: byFile[file] || file || '' };
   });
-  json(res, { ok: true, plays, count: lines.length });
+  // Repos seen recently ∪ any explicitly muted — each with its on/off state.
+  const names = new Set();
+  lines.forEach((l) => { const r = l.split('\t')[2]; if (r) names.add(r); });
+  Object.keys(cfg.repos).forEach((r) => names.add(r));
+  const repos = [...names].filter((n) => n && n !== '(unknown)').sort().map((name) => ({ name, enabled: cfg.repos[name] !== false }));
+  json(res, { ok: true, plays, count: lines.length, repos });
+}
+
+// POST /api/repo { repo, enabled } — mute/unmute the tag for a specific repo
+async function postRepo(req, res) {
+  const b = await readBody(req);
+  const repo = b && b.repo != null ? String(b.repo).trim() : '';
+  if (!repo) return json(res, { error: 'repo required' }, 400);
+  const cfg = normalize(readRaw());
+  if (b.enabled === false) cfg.repos[repo] = false;   // mute this repo
+  else delete cfg.repos[repo];                         // un-mute (default = plays)
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, { ok: true, repos: cfg.repos });
 }
 
 // binary resolution + runner (autotune/edit need ffmpeg + python)
@@ -511,6 +535,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/delete' && req.method === 'POST') return postDelete(req, res);
   if (pathname === '/api/skip' && req.method === 'POST') return postSkip(req, res);
   if (pathname === '/api/history' && req.method === 'GET') return getHistory(req, res);
+  if (pathname === '/api/repo' && req.method === 'POST') return postRepo(req, res);
   if (pathname === '/api/autotune' && req.method === 'POST') return postAutotune(req, res);
   if (pathname === '/api/edit' && req.method === 'POST') return postEdit(req, res);
   if (pathname === '/api/extract' && req.method === 'POST') return postExtract(req, res);

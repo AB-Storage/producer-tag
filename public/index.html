@@ -418,6 +418,16 @@
     </div>
   </div>
 
+  <!-- REPOSITORIES -->
+  <div class="card" id="repoCard" style="display:none">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Repositories <span class="count" id="repoCount">0</span>
+    </h2>
+    <p class="hint" style="margin-top:-6px;margin-bottom:14px">Mute the sound on specific repos — it keeps playing everywhere else.</p>
+    <div id="repoList"></div>
+  </div>
+
   <!-- ACTIVITY -->
   <div class="card" id="activityCard">
     <h2>
@@ -853,6 +863,7 @@ function ago(ts){ if(!ts) return ''; const s=Math.floor((Date.now()-ts)/1000);
   if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
 async function loadHistory(){
   let d; try{ d=await (await fetch(API+'/history')).json(); }catch(e){ return; }
+  renderRepos(d.repos||[]);
   $('playCount').textContent = d.count||0;
   const list = $('activityList');
   if(!d.plays||!d.plays.length){ list.innerHTML='<div class="act-empty">No plays yet. Push to a repo with the hooks installed and it shows up here.</div>'; return; }
@@ -863,6 +874,26 @@ async function loadHistory(){
       '<span class="ar-tag">'+esc(p.tag||'')+'</span>'+
       '<span class="ar-when">'+ago(p.ts)+'</span></div>';
   }).join('');
+}
+function renderRepos(repos){
+  const card=$('repoCard');
+  if(!repos.length){ card.style.display='none'; return; }
+  card.style.display=''; $('repoCount').textContent=repos.length;
+  $('repoList').innerHTML = repos.map(r=>
+    '<div class="row"><div><div class="label">'+esc(r.name)+'</div>'+
+    '<div class="sub">'+(r.enabled?'Plays your tag here':'Muted — silent here')+'</div></div>'+
+    '<label class="switch"><input type="checkbox" aria-label="Sound for '+esc(r.name)+'" data-repo="'+encodeURIComponent(r.name)+'"'+(r.enabled?' checked':'')+'>'+
+    '<span class="track"></span><span class="thumb"></span></label></div>'
+  ).join('');
+  $('repoList').querySelectorAll('input[data-repo]').forEach(inp=> inp.onchange=()=> setRepo(decodeURIComponent(inp.dataset.repo), inp.checked));
+}
+async function setRepo(repo, enabled){
+  try{
+    const r=await fetch(API+'/repo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo,enabled})});
+    const d=await r.json();
+    if(d.ok){ toast(enabled?('Sound on for '+repo):('Muted '+repo),'ok'); loadHistory(); }
+    else toast(d.error||'Failed','err');
+  }catch(e){ toast('Failed','err'); }
 }
 setInterval(loadHistory, 8000);
 

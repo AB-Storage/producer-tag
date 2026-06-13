@@ -20,17 +20,23 @@ CFG="$DATA/config.json"
 PY="$(command -v python3 || command -v python)"
 [ -n "$PY" ] || exit 0
 
-# Resolve: enabled | per-event flag | volume | file to play (random-aware) | notify
-read -r ENABLED EVENT_ON VOLUME SOUND NOTIFY <<EOF
-$("$PY" - "$CFG" "$EVENT" <<'PYEOF'
+# Repo name (for per-repo mute + the activity log).
+REPO="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)"
+[ -n "$REPO" ] || REPO="(unknown)"
+
+# Resolve: enabled | per-event flag | per-repo flag | volume | file | notify
+read -r ENABLED EVENT_ON REPO_ON VOLUME SOUND NOTIFY <<EOF
+$("$PY" - "$CFG" "$EVENT" "$REPO" <<'PYEOF'
 import json, sys, random
-cfg_path, event = sys.argv[1], sys.argv[2]
+cfg_path, event, repo = sys.argv[1], sys.argv[2], sys.argv[3]
 try:
     c = json.load(open(cfg_path))
 except Exception:
-    print("0 0 1.0 - 0"); sys.exit(0)
+    print("0 0 0 1.0 - 0"); sys.exit(0)
 enabled  = 1 if c.get("enabled") else 0
 event_on = 1 if (c.get("events", {}) or {}).get(event) else 0
+# Per-repo: plays unless this repo is explicitly turned off.
+repo_on  = 0 if (c.get("repos", {}) or {}).get(repo) is False else 1
 notify   = 1 if c.get("notify") else 0
 try:
     vol = float(c.get("volume", 1.0))
@@ -46,25 +52,23 @@ if c.get("mode") == "random":
     if pool:
         sound = random.choice(pool)
 sound = (sound or "").replace("/", "").replace("\\", "").strip()
-print(f"{enabled} {event_on} {vol} {sound} {notify}")
+print(f"{enabled} {event_on} {repo_on} {vol} {sound} {notify}")
 PYEOF
 )
 EOF
 
 [ "$ENABLED" = "1" ] || exit 0
 [ "$EVENT_ON" = "1" ] || exit 0
+[ "$REPO_ON" = "1" ] || exit 0
 [ -n "$SOUND" ] || exit 0
 SOUND_PATH="$DATA/$SOUND"
 [ -f "$SOUND_PATH" ] || exit 0
 
-# Repo name (for the log + notification)
-REPO="$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)"
-[ -n "$REPO" ] || REPO="(unknown)"
-
-# Append to the play history (plain TSV: epoch \t event \t repo \t soundfile), capped.
+# Append to the play history (plain TSV: epoch \t event \t repo \t soundfile),
+# capped to the last 50 lines so it never grows or lags.
 HIST="$DATA/history.log"
 printf '%s\t%s\t%s\t%s\n' "$(date +%s 2>/dev/null)" "$EVENT" "$REPO" "$SOUND" >> "$HIST" 2>/dev/null || true
-if [ -f "$HIST" ]; then tail -n 300 "$HIST" > "$HIST.tmp" 2>/dev/null && mv "$HIST.tmp" "$HIST" 2>/dev/null || true; fi
+if [ -f "$HIST" ]; then tail -n 50 "$HIST" > "$HIST.tmp" 2>/dev/null && mv "$HIST.tmp" "$HIST" 2>/dev/null || true; fi
 
 OS="$(uname -s 2>/dev/null)"
 case "$OS" in
