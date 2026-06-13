@@ -14,6 +14,8 @@ and optional **desktop notifications** show you exactly when and where it fired.
 It's purely local and just for fun. The git hooks run in the background and
 **always exit 0**, so they can never block, slow, or fail a commit or push.
 
+<p align="center"><img src="screenshot.png" width="460" alt="Producer Tag control panel"></p>
+
 ---
 
 ## Requirements
