@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Producer Tag</title>
+<script>try{if(location.search.indexOf('dark')>=0||localStorage.getItem('pt-theme')==='dark')document.documentElement.setAttribute('data-theme','dark');}catch(e){}</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMwZjZiNjAiLz48cGF0aCBkPSJNMjYgNDVWMjFsMTgtM3YyMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjZmMmU4IiBzdHJva2Utd2lkdGg9IjQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjxjaXJjbGUgY3g9IjIxIiBjeT0iNDUiIHI9IjUuNSIgZmlsbD0iI2Y2ZjJlOCIvPjxjaXJjbGUgY3g9IjM5IiBjeT0iNDAiIHI9IjUuNSIgZmlsbD0iI2Y2ZjJlOCIvPjwvc3ZnPg==">
 <style>
   :root{
@@ -14,6 +15,18 @@
     --danger:#c0392b; --success:#2f9e6a; --warning:#a6701a; --brass:#0f6b60;
     --r-card:20px; --r-ctl:11px; --pad-card:22px;
   }
+  :root[data-theme="dark"]{
+    --background:#0e1413; --surface:#161e1c; --surfaceElevated:#1d2725; --surfaceHover:#27322f;
+    --border:rgba(110,200,184,.12); --border2:rgba(110,200,184,.20);
+    --accent:#2bb39e; --accentHover:#39c6b1; --accent2:#2bb39e; --onAccent:#06231f;
+    --textPrimary:#e8efec; --textMuted:#9aaca6; --text3:#74837d;
+    --danger:#e5604c; --success:#4cc985; --warning:#e0b04a; --brass:#2bb39e;
+  }
+  :root[data-theme="dark"] body{ background:radial-gradient(1100px 460px at 50% -20%, rgba(43,179,158,.08), transparent 62%), var(--background); }
+  :root[data-theme="dark"] .seg{ background:rgba(0,0,0,.26); }
+  :root[data-theme="dark"] .rec-panel{ background:rgba(0,0,0,.20); }
+  :root[data-theme="dark"] .card{ box-shadow:none; }
+  :root[data-theme="dark"] .tag .badge{ background:rgba(43,179,158,.16); border-color:rgba(43,179,158,.32); }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
   body{
@@ -33,15 +46,19 @@
   header.app{display:flex;align-items:center;gap:14px;margin-bottom:30px}
   .logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(150deg,var(--accent),var(--accent2));
     display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 4px 16px rgba(15,107,96,.22)}
-  .logo svg{width:23px;height:23px;color:#fbf6ec}
+  .logo svg{width:23px;height:23px;color:var(--onAccent)}
   header.app h1{font-size:25px;font-weight:680;letter-spacing:-.02em}
   header.app p{font-size:14px;color:var(--textMuted);margin-top:2px}
+  .theme-btn{margin-left:auto;flex:0 0 auto;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);
+    background:var(--surface);color:var(--textMuted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .theme-btn:hover{background:var(--surfaceHover);color:var(--textPrimary)}
+  .theme-btn svg{width:18px;height:18px}
 
   /* cards — quiet surfaces, minimal borders */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-card);padding:var(--pad-card);margin-bottom:14px;box-shadow:0 1px 2px rgba(90,66,30,.05)}
   .card h2{font-size:11.5px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--textMuted);
     margin-bottom:16px;display:flex;align-items:center;gap:8px}
-  .card h2 svg{width:14px;height:14px;opacity:1;color:var(--accent)}
+  .card h2 > svg{width:14px;height:14px;opacity:1;color:var(--accent)}
   .card h2 .count{margin-left:8px;background:var(--surfaceElevated);border:1px solid var(--border);
     border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;color:var(--textMuted);letter-spacing:0}
 
@@ -50,7 +67,7 @@
   .seg button{border:none;background:transparent;color:var(--textMuted);font-family:inherit;font-size:12px;font-weight:600;
     letter-spacing:0;padding:6px 12px;border-radius:7px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px}
   .seg button svg{width:14px;height:14px;flex:0 0 auto}
-  .seg button.on{background:var(--accent);color:#fbf6ec}
+  .seg button.on{background:var(--accent);color:var(--onAccent)}
   .seg button:not(.on):hover{color:var(--textPrimary)}
 
   .row{display:flex;align-items:center;justify-content:space-between;gap:14px}
@@ -75,7 +92,7 @@
   .track{position:absolute;inset:0;background:var(--surfaceHover);border:1px solid var(--border2);border-radius:999px;transition:.2s}
   .thumb{position:absolute;top:3px;left:3px;width:21px;height:21px;background:#fff;border-radius:50%;transition:.2s cubic-bezier(.3,1.3,.5,1)}
   .switch input:checked ~ .track{background:var(--accent);border-color:transparent}
-  .switch input:checked ~ .thumb{left:22px;background:#fbf6ec}
+  .switch input:checked ~ .thumb{left:22px;background:#fff}
   .switch input:focus-visible ~ .track{outline:2px solid var(--accent);outline-offset:2px}
   .switch input:disabled ~ .track{opacity:.4}
 
@@ -87,7 +104,7 @@
   .btn:active:not(:disabled){transform:translateY(.5px)}
   .btn:disabled{opacity:.4;cursor:not-allowed}
   .btn svg{width:16px;height:16px}
-  .btn.primary{background:var(--accent);border-color:transparent;color:#fbf6ec}
+  .btn.primary{background:var(--accent);border-color:transparent;color:var(--onAccent)}
   .btn.primary:hover:not(:disabled){background:var(--accentHover)}
   .btn.rec{background:var(--danger);border-color:transparent;color:#fff}
   .btn.rec:hover:not(:disabled){filter:brightness(1.06)}
@@ -101,7 +118,7 @@
   .active-card h2 .seg{margin-left:auto}
   .now{display:flex;align-items:center;gap:16px}
   .now .play-lg{width:52px;height:52px;border-radius:14px;flex:0 0 auto;border:none;cursor:pointer;
-    background:var(--accent);color:#fbf6ec;display:flex;align-items:center;justify-content:center;transition:.15s}
+    background:var(--accent);color:var(--onAccent);display:flex;align-items:center;justify-content:center;transition:.15s}
   .now .play-lg:hover{background:var(--accentHover)}
   .now .play-lg:active{transform:scale(.96)}
   .now .play-lg svg{width:22px;height:22px;margin-left:1px}
@@ -126,7 +143,7 @@
     display:flex;align-items:center;justify-content:center;transition:.15s;background:transparent}
   .tag:hover .pick{border-color:var(--text3)}
   .tag.active .pick{border-color:var(--accent);background:var(--accent)}
-  .tag .pick svg{width:11px;height:11px;color:#fbf6ec;opacity:0;transition:.15s}
+  .tag .pick svg{width:11px;height:11px;color:var(--onAccent);opacity:0;transition:.15s}
   .tag.active .pick svg{opacity:1}
   .tag .pp{width:34px;height:34px;border-radius:9px;flex:0 0 auto;border:1px solid var(--border);background:var(--surface);
     color:var(--textPrimary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
@@ -271,7 +288,7 @@
   .chip{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--border);background:var(--surfaceElevated);
     color:var(--textPrimary);font-size:13px;font-weight:600;padding:10px;border-radius:10px;cursor:pointer;transition:.14s;font-family:inherit}
   .chip svg{width:15px;height:15px}
-  .chip.on{background:var(--accent);border-color:transparent;color:#fbf6ec}
+  .chip.on{background:var(--accent);border-color:transparent;color:var(--onAccent)}
   .chip:not(.on):hover{background:var(--surfaceHover)}
 
   .ed-actions{margin-top:18px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
@@ -290,6 +307,7 @@
       <h1>Producer Tag</h1>
       <p>Drop your signature sound every time you push to GitHub.</p>
     </div>
+    <button class="theme-btn" id="themeBtn" title="Toggle light / dark" aria-label="Toggle light / dark theme"></button>
   </header>
 
   <!-- MASTER / STATUS -->
@@ -534,6 +552,20 @@
 <script>
 const $ = id => document.getElementById(id);
 const API = '/api';
+
+// ---------- theme (light cream ⇄ dark teal) ----------
+const TH_SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></svg>';
+const TH_MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
+let theme='light'; try{ theme = localStorage.getItem('pt-theme')==='dark'?'dark':'light'; }catch(e){}
+if(location.search.indexOf('dark')>=0) theme='dark';
+function applyTheme(t){
+  theme = t==='dark'?'dark':'light';
+  document.documentElement.setAttribute('data-theme', theme);
+  $('themeBtn').innerHTML = theme==='dark' ? TH_SUN : TH_MOON;   // show what you'd switch TO
+  try{ localStorage.setItem('pt-theme', theme); }catch(e){}
+}
+applyTheme(theme);
+$('themeBtn').addEventListener('click', ()=> applyTheme(theme==='dark'?'light':'dark'));
 let state = { enabled:true, volume:1, events:{commit:false,push:true}, active:null, tags:[] };
 let recordedBlob = null;
 let atStyle = 'chipmunk';   // autotune style: subtle | hard | chipmunk
