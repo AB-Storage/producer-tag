@@ -173,6 +173,9 @@
   .path-row{display:flex;gap:10px;margin-top:12px}
   .path-row input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--textMuted);font-size:12.5px;padding:10px 13px;font-family:ui-monospace,Menlo,monospace;outline:none;transition:.15s}
   .path-row input:focus{border-color:var(--accent);color:var(--textPrimary);box-shadow:0 0 0 3px rgba(255,138,42,.16)}
+  .add-repo{display:flex;gap:10px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)}
+  .add-repo input{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border2);border-radius:10px;color:var(--textPrimary);font-size:13.5px;padding:10px 13px;font-family:inherit;outline:none;transition:.15s}
+  .add-repo input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,138,42,.16)}
 
   input[type=range]{-webkit-appearance:none;appearance:none;width:150px;height:4px;border-radius:999px;background:var(--surfaceHover);outline:none}
   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;
@@ -419,13 +422,17 @@
   </div>
 
   <!-- REPOSITORIES -->
-  <div class="card" id="repoCard" style="display:none">
+  <div class="card" id="repoCard">
     <h2>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       Repositories <span class="count" id="repoCount">0</span>
     </h2>
     <p class="hint" style="margin-top:-6px;margin-bottom:14px">Mute the sound on specific repos — it keeps playing everywhere else.</p>
     <div id="repoList"></div>
+    <div class="add-repo">
+      <input type="text" id="repoInput" maxlength="80" placeholder="Mute a repo by name (e.g. work-private)" aria-label="Repo name to mute">
+      <button class="btn" id="repoAdd">Mute</button>
+    </div>
   </div>
 
   <!-- ACTIVITY -->
@@ -876,10 +883,10 @@ async function loadHistory(){
   }).join('');
 }
 function renderRepos(repos){
-  const card=$('repoCard');
-  if(!repos.length){ card.style.display='none'; return; }
-  card.style.display=''; $('repoCount').textContent=repos.length;
-  $('repoList').innerHTML = repos.map(r=>
+  $('repoCount').textContent=repos.length;
+  const list=$('repoList');
+  if(!repos.length){ list.innerHTML='<div class="act-empty" style="padding:6px 0 2px">Repos show up here after their first push — or add one below to mute it ahead of time.</div>'; return; }
+  list.innerHTML = repos.map(r=>
     '<div class="row"><div><div class="label">'+esc(r.name)+'</div>'+
     '<div class="sub">'+(r.enabled?'Plays your tag here':'Muted — silent here')+'</div></div>'+
     '<label class="switch"><input type="checkbox" aria-label="Sound for '+esc(r.name)+'" data-repo="'+encodeURIComponent(r.name)+'"'+(r.enabled?' checked':'')+'>'+
@@ -895,6 +902,9 @@ async function setRepo(repo, enabled){
     else toast(d.error||'Failed','err');
   }catch(e){ toast('Failed','err'); }
 }
+function addRepoMute(){ const n=$('repoInput').value.trim(); if(!n) return; $('repoInput').value=''; setRepo(n, false); }
+$('repoAdd').addEventListener('click', addRepoMute);
+$('repoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addRepoMute(); });
 setInterval(loadHistory, 8000);
 
 // ========================= AUDIO EDITOR =========================
