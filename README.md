@@ -44,22 +44,24 @@ repo's own hooks, so anything you already had keeps working.
 Change the port with `PORT=8080 npm start`. Sounds and settings are stored in
 `~/.producer-tag/` (override with `PRODUCER_TAG_HOME`).
 
-## Desktop app
+## Desktop window
 
-Prefer a real window you can open and close instead of a terminal? There's an
-Electron wrapper:
+Prefer a real window you can open and close instead of a browser tab?
 
 ```bash
-npm install        # one-time — pulls in Electron
-npm run app        # opens the Producer Tag window (Mac / Windows / Linux)
-
-npm run dist       # optional — build an installer (.dmg / .exe / .AppImage) into dist/
+npm run app
 ```
 
+This opens Producer Tag in a clean, chromeless app window — **no Electron, no
+install, no extra dependencies.** It just starts the server and opens the panel
+in an app window using whatever Chromium-based browser you already have (Chrome,
+Edge, Brave…). Edge ships with Windows, so it works there out of the box.
+**Close the window and the app quits.**
+
 The window **is** just the control panel. The git hooks read `~/.producer-tag`
-directly, so **closing the app never stops your tag from firing** — open it only
-when you want to record, edit, or change settings. (Headless? `node server.js`
-still works with zero dependencies.)
+directly, so **closing it never stops your tag from firing** — open it only when
+you want to record, edit, or change settings. (Headless? `node server.js` still
+works with zero dependencies.)
 
 ## What you can do
 

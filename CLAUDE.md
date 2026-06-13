@@ -51,6 +51,9 @@ python3 -c "import numpy" 2>/dev/null && echo "numpy OK"
 ```bash
 cd <this repo>
 npm start                      # serves http://localhost:7777  (override: PORT=8080 npm start)
+# or, for a desktop window instead of a browser tab (no extra deps — uses an
+# installed Chromium browser; Edge on Windows works out of the box):
+npm run app
 ```
 
 Leave it running. Tell the user to open **http://localhost:7777** and:
