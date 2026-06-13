@@ -143,12 +143,22 @@ All JSON, served at `http://localhost:7777`:
 - `POST /api/test {id?}` — play through speakers (afplay)
 - `GET  /api/history` — last 10 plays + `repos:[{name,enabled}]` (per-repo state). The hook trims the log to 50 lines.
 - `POST /api/repo {repo, enabled}` — mute/unmute the tag for one repo
-- `POST /api/scan {dir}` — find git repos under a folder and register them in the panel
+- `POST /api/scan {dir}` — find git repos under a folder and register them in the panel. Skips throwaway/auto-named repos (docker-style `adjective-noun-hex` worktrees, `auto-*`/`agent-*` scratch dirs) and worktrees, so only real projects are added.
 
 > Safety: `scan` and `extract`'s `path` only accept folders/files **inside the user's home
 > directory** (symlinks resolved). The server is localhost-only and makes no outbound calls.
 
 ## Controlling which repos play
+
+> **This is a LOCAL tool, not a GitHub integration — set expectations up front.** The panel
+> lists repos **cloned on this machine** that fire a *local* `git commit`/`push`, keyed by the
+> repo's **local folder basename**. It does **not** read the user's GitHub account. So if a user
+> says "I have lots of repos on GitHub but only see a few here," that's expected: (a) repos they haven't
+> pushed to since installing haven't shown up yet, (b) GitHub repos not cloned on this machine
+> can never fire a local hook, and (c) local folder names often differ from GitHub repo names
+> (`my-app` vs `my-app-ios`). Don't wire this to the GitHub API to "fix" it —
+> that would break the local-only / no-outbound-calls guarantee. Just scan their local projects
+> folder or let repos appear as they push.
 
 By default the tag plays in **every** repo. The **Repositories** panel lets the user
 scope that:
@@ -158,6 +168,13 @@ scope that:
 - Repos appear automatically after their first push. The user can also **add one by name**
   (to pre-mute/allow before it fires) or **Scan a folder** (e.g. `~/Code`) to register every
   git repo under it at once.
+
+> Don't try to bulk-register *every* repo on the machine (e.g. a blind `find ~ -name .git`).
+> A real dev machine is full of **non-project** git repos — tool-generated worktrees with
+> docker-style names (`blissful-lamarr-f4b591`), `auto-*`/`agent-*` scratch dirs, package
+> caches, downloaded samples — and registering them all buries the user's real projects.
+> `scan` already skips these, but the safest path is to **scan the user's actual projects
+> folder** (ask them where it is) or let repos appear on their own after they push.
 
 Under the hood this is `config.json` → `repoMode` + `repos:{ "<name>": true|false }`, where
 `<name>` is the repo folder's basename. The hook reads it: in `all` mode it skips repos set to

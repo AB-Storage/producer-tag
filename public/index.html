@@ -940,8 +940,8 @@ function renderRepos(repos, mode){
   repoMode = mode==='only'?'only':'all';
   $('repoModeSeg').querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.rmode===repoMode));
   $('repoHint').textContent = repoMode==='only'
-    ? 'These are repos that have played your tag (or that you add). It plays only in the ones you turn on.'
-    : 'These are repos that have played your tag (or that you add). It plays in all of them — turn one off to mute it.';
+    ? 'Local repos on this machine — the tag fires on local commits/pushes (this isn\'t your GitHub repo list). It plays only in the ones you turn on.'
+    : 'Local repos on this machine — the tag fires on local commits/pushes (this isn\'t your GitHub repo list). It plays in all of them; turn one off to mute it.';
   $('repoInput').placeholder = repoMode==='only' ? 'Allow a repo by name' : 'Mute a repo by name';
   $('repoAdd').textContent = repoMode==='only' ? 'Allow' : 'Mute';
   $('repoCount').textContent=repos.length;

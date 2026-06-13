@@ -81,6 +81,10 @@ works with zero dependencies.)
 - **Fixed / Random** — Fixed plays your chosen tag; Random surprises you with a
   different one each push. Exclude individual tags from the shuffle.
 - **Triggers** — play on push (default), on commit, or both. Per-event toggles.
+- **Per-repo control** — choose which repos play the tag: mute individual ones, or
+  switch to an allow-list. The panel lists repos **on your machine** that fire a
+  *local* commit/push — it's **not** your GitHub repo list, so a repo shows up once
+  you've pushed to it locally (or you add / scan it). Names are local folder names.
 - **Volume** — applied when the tag fires.
 - **Autotune** — detects the tag's pitch, snaps it to the nearest note, and adds
   character. Three styles:
