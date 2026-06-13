@@ -31,6 +31,8 @@
     "public/",
     "hooks/",
     "install.sh",
+    "Producer Tag.app/",
+    "Producer Tag.bat",
     "CLAUDE.md",
     "AGENTS.md"
   ]

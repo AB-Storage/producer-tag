@@ -48,6 +48,13 @@ Change the port with `PORT=8080 npm start`. Sounds and settings are stored in
 
 Prefer a real window you can open and close instead of a browser tab?
 
+**Just double-click it** — no terminal needed:
+- **macOS:** `Producer Tag.app` (drag it to your Applications or Dock).
+  First launch: if macOS blocks it, right-click → **Open** once.
+- **Windows:** `Producer Tag.bat`
+
+Or from a terminal:
+
 ```bash
 npm run app
 ```
