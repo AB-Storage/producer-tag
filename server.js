@@ -416,6 +416,54 @@ async function postEdit(req, res) {
   json(res, { ok: true, id: outId, ...pub(cfg) });
 }
 
+// POST /api/extract — pull audio out of ANY file (video or audio, any format
+// ffmpeg reads). Accepts an uploaded file (contentB64) OR a local file path
+// (no size limit — runs on the user's machine). Saves the audio as a tag.
+async function postExtract(req, res) {
+  const body = (await readBody(req).catch(() => ({}))) || {};
+  const { ffmpeg: FFMPEG } = bins();
+  let inputPath = '', tmpInput = '';
+  if (body.path) {
+    const p = String(body.path).trim().replace(/^~(?=\/)/, os.homedir());
+    let st; try { st = fs.statSync(p); } catch { return json(res, { error: 'file not found: ' + p }, 404); }
+    if (!st.isFile()) return json(res, { error: 'not a file: ' + p }, 400);
+    inputPath = p;
+  } else if (body.contentB64) {
+    const b64 = String(body.contentB64);
+    if (b64.length > 80 * 1024 * 1024) return json(res, { error: 'file too large (~60MB max) — use the file-path field for big files' }, 413);
+    const ext = String(body.ext || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6) || 'bin';
+    tmpInput = path.join(DATA_DIR, '_extract_' + Date.now().toString(36) + '.' + ext);
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(tmpInput, Buffer.from(b64, 'base64')); }
+    catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+    inputPath = tmpInput;
+  } else return json(res, { error: 'contentB64 or path required' }, 400);
+
+  const cfg = normalize(readRaw());
+  const outId = 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const outFile = 'tag_' + outId + '.wav';
+  const outPath = path.join(DATA_DIR, outFile);
+  const args = ['-y'];
+  const start = Number(body.start) || 0; if (start > 0) args.push('-ss', String(start));
+  args.push('-i', inputPath);
+  const dur = Number(body.duration) || 0; if (dur > 0) args.push('-t', String(dur));
+  args.push('-vn', '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le', outPath);
+  const cleanup = () => { if (tmpInput) { try { fs.unlinkSync(tmpInput); } catch {} } };
+  try { await runCmd(FFMPEG, args); }
+  catch (e) { try { fs.unlinkSync(outPath); } catch {} cleanup(); return json(res, { error: 'extract failed (need ffmpeg): ' + e.message }, 501); }
+  cleanup();
+  let size = 0; try { size = fs.statSync(outPath).size; } catch {}
+  if (!size) { try { fs.unlinkSync(outPath); } catch {} return json(res, { error: 'no audio track found in that file' }, 422); }
+  let name = String(body.name || '').trim().replace(/[\r\n\t]+/g, ' ').slice(0, 60);
+  if (!name) {
+    const base = body.path ? String(body.path).split(/[\\/]/).pop() : (body.filename || 'Extracted');
+    name = String(base).replace(/\.[^.]+$/, '').slice(0, 60) || 'Extracted';
+  }
+  cfg.tags.push({ id: outId, name, file: outFile, ext: 'wav', size, createdAt: Date.now(), skipRandom: false });
+  cfg.active = outId;
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, { ok: true, id: outId, name, size, ...pub(cfg) });
+}
+
 async function postTest(req, res) {
   const b = (await readBody(req)) || {};
   const cfg = normalize(readRaw());
@@ -465,6 +513,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/history' && req.method === 'GET') return getHistory(req, res);
   if (pathname === '/api/autotune' && req.method === 'POST') return postAutotune(req, res);
   if (pathname === '/api/edit' && req.method === 'POST') return postEdit(req, res);
+  if (pathname === '/api/extract' && req.method === 'POST') return postExtract(req, res);
   if (pathname === '/api/test' && req.method === 'POST') return postTest(req, res);
   res.writeHead(404, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({ error: 'not found' }));
