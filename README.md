@@ -100,6 +100,11 @@ the WebM/Opus that browsers record by default. Uploads accept `wav`, `mp3`,
 - Or remove the hooks: delete `post-commit`, `pre-push`, and `producer-tag-play.sh`
   from the repo's hooks directory (and restore any `*.local` backup).
 
+## For AI assistants
+
+Handing this repo to Claude Code, Cursor, or another agent to set up? Point it at
+**[CLAUDE.md](CLAUDE.md)** — a full install/verify/troubleshoot runbook.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

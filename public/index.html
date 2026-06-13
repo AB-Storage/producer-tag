@@ -636,8 +636,11 @@ async function autotuneTag(id, btn){
   catch(e){ toast('Autotune failed','err'); }
   finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
 }
+// Browser <audio> max volume is 1.0; the config volume goes 0–2 (afplay can boost
+// past 100%). Preview reflects the slider up to 100%; the real fired tag uses afplay.
+function curVol(){ const v = state.volume!=null?state.volume:1; return Math.max(0, Math.min(1, v)); }
 function previewTag(id, fromActive){
-  const p = $('player'); p.src = API+'/sound?id='+encodeURIComponent(id)+'&t='+Date.now();
+  const p = $('player'); p.volume = curVol(); p.src = API+'/sound?id='+encodeURIComponent(id)+'&t='+Date.now();
   if(fromActive) $('activeCard').classList.add('playing');
   p.onended = ()=> $('activeCard').classList.remove('playing');
   p.play().catch(()=>toast('Could not play preview','err'));
@@ -659,7 +662,9 @@ $('pushToggle').addEventListener('change', e=> postConfig({events:{push:e.target
 $('commitToggle').addEventListener('change', e=> postConfig({events:{commit:e.target.checked}}) );
 $('notifyToggle').addEventListener('change', e=> postConfig({notify:e.target.checked}) );
 let volT;
-$('volRange').addEventListener('input', e=>{ $('volVal').textContent=Math.round(e.target.value*100)+'%'; clearTimeout(volT); volT=setTimeout(()=>postConfig({volume:parseFloat(e.target.value)}),300); });
+$('volRange').addEventListener('input', e=>{ const v=parseFloat(e.target.value); $('volVal').textContent=Math.round(v*100)+'%';
+  state.volume=v; const lv=Math.max(0,Math.min(1,v)); $('player').volume=lv; ed.audio.volume=lv;   // live preview volume
+  clearTimeout(volT); volT=setTimeout(()=>postConfig({volume:v}),300); });
 $('modeSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
   const m = b.dataset.mode; if(m===(state.mode||'fixed')) return;
   postConfig({mode:m}); toast(m==='random'?'Random mode — surprise each push':'Fixed — plays your chosen tag','ok');
@@ -707,7 +712,7 @@ function resetRecUI(){
   $('prevRecBtn').disabled=true; $('saveRow').style.display='none'; $('recName').value='';
 }
 $('recBtn').addEventListener('click', ()=>{ recording ? stopRec() : startRec(); });
-$('prevRecBtn').addEventListener('click', ()=>{ if(!recordedBlob) return; const p=$('player'); p.src=URL.createObjectURL(recordedBlob); p.play().catch(()=>{}); });
+$('prevRecBtn').addEventListener('click', ()=>{ if(!recordedBlob) return; const p=$('player'); p.volume=curVol(); p.src=URL.createObjectURL(recordedBlob); p.play().catch(()=>{}); });
 $('saveRecBtn').addEventListener('click', async ()=>{
   if(!recordedBlob) return;
   const name = $('recName').value.trim();
@@ -869,13 +874,13 @@ function gatherEffects(){
   const fo=parseFloat($('edFadeOut').value); if(fo>0) e.fadeOut=fo;
   return e;
 }
-$('edPlayOrig').addEventListener('click', ()=>{ const a=ed.audio; a.src=API+'/sound?id='+encodeURIComponent(ed.id)+'&t='+Date.now(); a.play().catch(()=>toast('Could not play','err')); });
+$('edPlayOrig').addEventListener('click', ()=>{ const a=ed.audio; a.volume=curVol(); a.src=API+'/sound?id='+encodeURIComponent(ed.id)+'&t='+Date.now(); a.play().catch(()=>toast('Could not play','err')); });
 $('edPreview').addEventListener('click', async ()=>{
   const btn=$('edPreview'); btn.disabled=true; toast('Rendering preview…');
   try{
     const r=await fetch(API+'/edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:ed.id,save:'preview',effects:gatherEffects()})});
     if(!r.ok){ const d=await r.json().catch(()=>({})); toast(d.error||'Preview failed','err'); return; }
-    const blob=await r.blob(); ed.audio.src=URL.createObjectURL(blob); ed.audio.play().catch(()=>toast('Could not play preview','err'));
+    const blob=await r.blob(); ed.audio.volume=curVol(); ed.audio.src=URL.createObjectURL(blob); ed.audio.play().catch(()=>toast('Could not play preview','err'));
   }catch(e){ toast('Preview failed','err'); } finally{ btn.disabled=false; }
 });
 async function saveEdit(mode){

@@ -441,7 +441,7 @@ async function postTest(req, res) {
 function serveIndex(res) {
   fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (err, buf) => {
     if (err) { res.writeHead(500); return res.end('index.html missing'); }
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
     res.end(buf);
   });
 }
