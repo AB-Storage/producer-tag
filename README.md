@@ -1,3 +1,5 @@
+<p align="center"><img src="icon.png" width="120" alt="Producer Tag"></p>
+
 # Producer Tag
 
 Drop your signature sound — DJ-style — every time you push to git.
