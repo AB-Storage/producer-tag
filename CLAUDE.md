@@ -135,9 +135,31 @@ rm -rf ~/.producer-tag                               # removes all tags + settin
 
 All JSON, served at `http://localhost:7777`:
 
-- `GET  /api/config` · `POST /api/config` — `{enabled, volume(0–2), mode:'fixed'|'random', notify, events:{commit,push}}`
+- `GET  /api/config` · `POST /api/config` — `{enabled, volume(0–2), mode:'fixed'|'random', notify, events:{commit,push}, repoMode:'all'|'only'}`
 - `POST /api/sound` — add a tag `{contentB64, ext, name}` (base64 audio; wav/mp3/m4a/aac/aiff/caf)
 - `GET  /api/sound[?id=]` — stream a tag (Range-enabled) · `POST /api/active {id}` · `POST /api/rename {id,name}` · `POST /api/delete {id}` · `POST /api/skip {id,skip}`
 - `POST /api/autotune {id?, style:'subtle'|'hard'|'chipmunk'}` — adds a tuned copy
 - `POST /api/edit {id?, save:'preview'|'new'|'replace', effects:{trimStart,trimEnd,pitch,speed,gain,fadeIn,fadeOut,reverse,reverb,autotune}}`
-- `POST /api/test {id?}` — play through speakers (afplay) · `GET /api/history` — recent plays
+- `POST /api/test {id?}` — play through speakers (afplay)
+- `GET  /api/history` — last 10 plays + `repos:[{name,enabled}]` (per-repo state). The hook trims the log to 50 lines.
+- `POST /api/repo {repo, enabled}` — mute/unmute the tag for one repo
+- `POST /api/scan {dir}` — find git repos under a folder and register them in the panel
+
+## Controlling which repos play
+
+By default the tag plays in **every** repo. The **Repositories** panel lets the user
+scope that:
+
+- **All repos** (default) — plays everywhere; toggle a repo **off** to mute it there.
+- **Only selected** — silent everywhere *except* repos the user turns **on** (an allowlist).
+- Repos appear automatically after their first push. The user can also **add one by name**
+  (to pre-mute/allow before it fires) or **Scan a folder** (e.g. `~/Code`) to register every
+  git repo under it at once.
+
+Under the hood this is `config.json` → `repoMode` + `repos:{ "<name>": true|false }`, where
+`<name>` is the repo folder's basename. The hook reads it: in `all` mode it skips repos set to
+`false`; in `only` mode it plays only repos set to `true`.
+
+> Note: the panel only knows about repos that have **played the tag** (or that the user added /
+> scanned). It does **not** query GitHub or scan the whole disk — it reads
+> `~/.producer-tag/history.log` plus the user's explicit repo settings.

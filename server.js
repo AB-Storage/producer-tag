@@ -332,6 +332,39 @@ async function postRepo(req, res) {
   json(res, { ok: true, repos: cfg.repos });
 }
 
+// Find git repos under a folder (a dir containing a .git folder), bounded.
+function findRepos(root, maxDepth) {
+  const out = []; const stack = [[root, 0]];
+  while (stack.length && out.length < 300) {
+    const [dir, depth] = stack.pop();
+    let entries; try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    if (entries.some((e) => e.isDirectory() && e.name === '.git')) { out.push(path.basename(dir)); continue; }
+    if (depth >= maxDepth) continue;
+    for (const e of entries) {
+      if (!e.isDirectory() || e.name.startsWith('.') || e.name === 'node_modules') continue;
+      stack.push([path.join(dir, e.name), depth + 1]);
+    }
+  }
+  return out;
+}
+
+// POST /api/scan { dir } — list git repos under a local folder and register them
+async function postScan(req, res) {
+  const b = await readBody(req);
+  let dir = b && b.dir != null ? String(b.dir).trim() : '';
+  if (!dir) return json(res, { error: 'folder path required' }, 400);
+  dir = dir.replace(/^~(?=[/\\])/, os.homedir());
+  let st; try { st = fs.statSync(dir); } catch { return json(res, { error: 'folder not found: ' + dir }, 404); }
+  if (!st.isDirectory()) return json(res, { error: 'not a folder: ' + dir }, 400);
+  const found = findRepos(dir, 4);
+  const cfg = normalize(readRaw());
+  const def = cfg.repoMode === 'only' ? false : true;   // appear with the mode's default
+  let added = 0;
+  found.forEach((name) => { if (!(name in cfg.repos)) { cfg.repos[name] = def; added++; } });
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, { ok: true, found: found.length, added });
+}
+
 // binary resolution + runner (autotune/edit need ffmpeg + python)
 function bins() {
   const HOME = os.homedir();
@@ -538,6 +571,7 @@ const server = http.createServer((req, res) => {
   if (pathname === '/api/skip' && req.method === 'POST') return postSkip(req, res);
   if (pathname === '/api/history' && req.method === 'GET') return getHistory(req, res);
   if (pathname === '/api/repo' && req.method === 'POST') return postRepo(req, res);
+  if (pathname === '/api/scan' && req.method === 'POST') return postScan(req, res);
   if (pathname === '/api/autotune' && req.method === 'POST') return postAutotune(req, res);
   if (pathname === '/api/edit' && req.method === 'POST') return postEdit(req, res);
   if (pathname === '/api/extract' && req.method === 'POST') return postExtract(req, res);
