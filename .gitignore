@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.log
+
+# Local test sounds / scratch data (real data lives in ~/.producer-tag)
+/tmp-tags/
+*.wav
+*.m4a
+*.mp3
+*.aac
+*.aiff
+*.caf

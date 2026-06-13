@@ -1,0 +1,330 @@
+#!/usr/bin/env node
+/*
+ * Producer Tag — local control panel server.
+ *
+ * Serves the web UI and a small JSON API for managing your "producer tag"
+ * sounds: record/upload a library of tags, pick the active one, autotune,
+ * and toggle when it plays on git events. The git hooks read the same config
+ * and play the active (or a random) tag via afplay.
+ *
+ * Pure Node stdlib — no dependencies. Data lives in ~/.producer-tag/.
+ */
+'use strict';
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
+const os = require('os');
+
+const PORT = Number(process.env.PORT) || 7777;
+const DATA_DIR = process.env.PRODUCER_TAG_HOME || path.join(os.homedir(), '.producer-tag');
+const CFG_FILE = path.join(DATA_DIR, 'config.json');
+const PUBLIC_DIR = path.join(__dirname, 'public');
+
+// afplay (macOS CoreAudio) plays these — NOT webm/opus (the browser recorder default).
+const EXTS = ['wav', 'm4a', 'aac', 'mp3', 'aiff', 'caf'];
+const MIME = { wav: 'audio/wav', m4a: 'audio/mp4', aac: 'audio/aac', mp3: 'audio/mpeg', aiff: 'audio/aiff', caf: 'audio/x-caf' };
+
+// ── helpers ──────────────────────────────────────────────────────────────
+function json(res, data, status = 200) {
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-cache' });
+  res.end(JSON.stringify(data));
+}
+function readBody(req) {
+  return new Promise((resolve) => {
+    let d = '';
+    req.on('data', (c) => (d += c));
+    req.on('end', () => { try { resolve(JSON.parse(d)); } catch { resolve(d); } });
+    req.on('error', () => resolve(null));
+  });
+}
+function firstExist(cands, fallback) { return cands.find((p) => p && fs.existsSync(p)) || fallback; }
+
+// ── config model: a LIBRARY of tags; one is "active". `sound` mirrors the
+//    active tag's filename so the git hook stays a one-liner. ──────────────
+function readRaw() { try { return JSON.parse(fs.readFileSync(CFG_FILE, 'utf8')); } catch { return {}; } }
+
+function normalize(raw) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  const cfg = {
+    enabled: raw.enabled !== false,                 // default ON
+    volume: Math.max(0, Math.min(2, Number(raw.volume) || 1.0)),
+    mode: raw.mode === 'random' ? 'random' : 'fixed',
+    events: { commit: !!(raw.events && raw.events.commit), push: raw.events ? !!raw.events.push : true },
+    active: raw.active != null ? String(raw.active) : null,
+    tags: [],
+  };
+  const seen = new Set();
+  if (Array.isArray(raw.tags)) {
+    for (const t of raw.tags) {
+      if (!t || typeof t !== 'object') continue;
+      const file = String(t.file || '').replace(/[\\/]/g, '');
+      if (!file || seen.has(file)) continue;
+      let size = 0;
+      try { size = fs.statSync(path.join(DATA_DIR, file)).size; } catch { continue; }
+      seen.add(file);
+      cfg.tags.push({
+        id: String(t.id || file),
+        name: String(t.name || 'Untitled tag').slice(0, 60),
+        file, ext: (file.split('.').pop() || 'wav').toLowerCase(),
+        size, createdAt: Number(t.createdAt) || 0, skipRandom: !!t.skipRandom,
+      });
+    }
+  }
+  if (!cfg.tags.find((t) => t.id === cfg.active)) cfg.active = cfg.tags.length ? cfg.tags[0].id : null;
+  return cfg;
+}
+function activeTag(cfg) { return cfg.tags.find((t) => t.id === cfg.active) || null; }
+function write(cfg) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const a = activeTag(cfg);
+  fs.writeFileSync(CFG_FILE, JSON.stringify({
+    enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, events: cfg.events,
+    active: cfg.active, sound: a ? a.file : '',
+    tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, file: t.file, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
+  }, null, 2));
+}
+function pub(cfg) {
+  const a = activeTag(cfg);
+  return {
+    ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, events: cfg.events,
+    active: cfg.active, hasSound: !!a, soundSize: a ? a.size : 0,
+    tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
+  };
+}
+
+// ── handlers ─────────────────────────────────────────────────────────────
+function getConfig(req, res) { const cfg = normalize(readRaw()); try { write(cfg); } catch {} json(res, pub(cfg)); }
+
+async function postConfig(req, res) {
+  const b = await readBody(req);
+  if (!b || typeof b !== 'object') return json(res, { error: 'invalid body' }, 400);
+  const cfg = normalize(readRaw());
+  if (typeof b.enabled === 'boolean') cfg.enabled = b.enabled;
+  if (b.volume != null) cfg.volume = Math.max(0, Math.min(2, Number(b.volume) || 1.0));
+  if (b.mode != null) cfg.mode = b.mode === 'random' ? 'random' : 'fixed';
+  if (b.events) {
+    if (typeof b.events.commit === 'boolean') cfg.events.commit = b.events.commit;
+    if (typeof b.events.push === 'boolean') cfg.events.push = b.events.push;
+  }
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, pub(cfg));
+}
+
+async function postSound(req, res) {
+  const b = await readBody(req);
+  if (!b || typeof b !== 'object') return json(res, { error: 'invalid body' }, 400);
+  const b64 = String(b.contentB64 || '');
+  if (!b64) return json(res, { error: 'contentB64 required' }, 400);
+  if (b64.length > 14 * 1024 * 1024) return json(res, { error: 'file too large (max 10MB)' }, 413);
+  let ext = String(b.ext || 'wav').toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!EXTS.includes(ext)) ext = 'wav';
+  const cfg = normalize(readRaw());
+  const id = 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const file = 'tag_' + id + '.' + ext;
+  const name = String(b.name || '').trim().replace(/[\r\n\t]+/g, ' ').slice(0, 60) || 'Tag ' + (cfg.tags.length + 1);
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const buf = Buffer.from(b64, 'base64');
+    fs.writeFileSync(path.join(DATA_DIR, file), buf);
+    cfg.tags.push({ id, name, file, ext, size: buf.length, createdAt: Date.now(), skipRandom: false });
+    cfg.active = id;
+    write(cfg);
+    json(res, { ok: true, id, name, ext, size: buf.length });
+  } catch (e) { json(res, { error: 'write failed: ' + e.message }, 500); }
+}
+
+function getSound(req, res, query) {
+  const cfg = normalize(readRaw());
+  const tag = query.id ? cfg.tags.find((t) => t.id === String(query.id)) : activeTag(cfg);
+  if (!tag) return json(res, { error: 'no sound' }, 404);
+  const p = path.join(DATA_DIR, tag.file);
+  if (!fs.existsSync(p)) return json(res, { error: 'missing file' }, 404);
+  res.writeHead(200, { 'Content-Type': MIME[tag.ext] || 'application/octet-stream', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' });
+  fs.createReadStream(p).pipe(res);
+}
+
+async function postActive(req, res) {
+  const b = await readBody(req);
+  const id = b && b.id != null ? String(b.id) : '';
+  const cfg = normalize(readRaw());
+  if (!cfg.tags.find((t) => t.id === id)) return json(res, { error: 'unknown tag' }, 404);
+  cfg.active = id;
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, pub(cfg));
+}
+
+async function postRename(req, res) {
+  const b = await readBody(req);
+  const id = b && b.id != null ? String(b.id) : '';
+  const name = String((b && b.name) || '').trim().replace(/[\r\n\t]+/g, ' ').slice(0, 60);
+  const cfg = normalize(readRaw());
+  const t = cfg.tags.find((x) => x.id === id);
+  if (!t) return json(res, { error: 'unknown tag' }, 404);
+  if (!name) return json(res, { error: 'name required' }, 400);
+  t.name = name;
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, pub(cfg));
+}
+
+async function postDelete(req, res) {
+  const b = await readBody(req);
+  const id = b && b.id != null ? String(b.id) : '';
+  const cfg = normalize(readRaw());
+  const t = cfg.tags.find((x) => x.id === id);
+  if (!t) return json(res, { error: 'unknown tag' }, 404);
+  try { fs.unlinkSync(path.join(DATA_DIR, t.file)); } catch {}
+  cfg.tags = cfg.tags.filter((x) => x.id !== id);
+  if (cfg.active === id) cfg.active = cfg.tags.length ? cfg.tags[0].id : null;
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, pub(cfg));
+}
+
+async function postSkip(req, res) {
+  const b = await readBody(req);
+  const id = b && b.id != null ? String(b.id) : '';
+  const cfg = normalize(readRaw());
+  const t = cfg.tags.find((x) => x.id === id);
+  if (!t) return json(res, { error: 'unknown tag' }, 404);
+  t.skipRandom = !!(b && b.skip);
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, pub(cfg));
+}
+
+// Real autotune: numpy detects the dominant pitch, snaps to the nearest
+// semitone, ffmpeg+rubberband pitch-corrects with style-specific character.
+async function postAutotune(req, res) {
+  const b = (await readBody(req)) || {};
+  const cfg = normalize(readRaw());
+  const src = b.id ? cfg.tags.find((t) => t.id === String(b.id)) : activeTag(cfg);
+  if (!src) return json(res, { error: 'no sound' }, 404);
+  const srcPath = path.join(DATA_DIR, src.file);
+  if (!fs.existsSync(srcPath)) return json(res, { error: 'missing file' }, 404);
+  const style = ['subtle', 'hard', 'chipmunk'].includes(b.style) ? b.style : 'subtle';
+
+  const { execFile } = require('child_process');
+  const run = (cmd, args) => new Promise((resolve, reject) => {
+    execFile(cmd, args, { timeout: 30000, maxBuffer: 4 * 1024 * 1024 }, (err, out, errout) =>
+      err ? reject(new Error(String(errout || err.message || '').slice(0, 300))) : resolve(String(out)));
+  });
+  const HOME = os.homedir();
+  const FFMPEG = firstExist([process.env.FFMPEG, path.join(HOME, '.local/bin/ffmpeg'), '/opt/homebrew/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/usr/bin/ffmpeg'], 'ffmpeg');
+  const PYTHON = firstExist(['/usr/bin/python3', path.join(HOME, '.local/bin/python3'), '/opt/homebrew/bin/python3', '/usr/local/bin/python3'], 'python3');
+
+  const PY = `
+import sys, wave, numpy as np
+try:
+    w=wave.open(sys.argv[1],'rb'); sr=w.getframerate(); n=w.getnframes(); ch=w.getnchannels(); sw=w.getsampwidth()
+    raw=w.readframes(n); w.close()
+    dt={1:np.int8,2:np.int16,4:np.int32}.get(sw,np.int16)
+    x=np.frombuffer(raw,dtype=dt).astype(np.float64)
+    if ch>1: x=x.reshape(-1,ch).mean(axis=1)
+    if x.size<256: print("1.0"); sys.exit(0)
+    x=x-np.mean(x); m=np.max(np.abs(x))
+    if m>0: x=x/m
+    win=min(2048,x.size); hop=512
+    if x.size>win:
+        e=np.array([np.sum(x[i:i+win]**2) for i in range(0,x.size-win,hop)])
+        s=int(np.argmax(e))*hop; seg=x[s:s+win*4]
+    else: seg=x
+    seg=seg-np.mean(seg)
+    ac=np.correlate(seg,seg,'full')[len(seg)-1:]
+    lo=max(1,int(sr/500)); hi=min(len(ac),int(sr/80))
+    if hi<=lo: print("1.0"); sys.exit(0)
+    peak=lo+int(np.argmax(ac[lo:hi])); f0=sr/peak if peak>0 else 0
+    if f0<=0: print("1.0"); sys.exit(0)
+    midi=69+12*np.log2(f0/440.0); tgt=440.0*2**((round(midi)-69)/12.0); r=tgt/f0
+    print("%.5f"%max(0.80,min(1.25,r)))
+except Exception:
+    print("1.0")
+`;
+  let ratio = '1.0';
+  try { ratio = (await run(PYTHON, ['-c', PY, srcPath])).trim() || '1.0'; }
+  catch (e) { return json(res, { error: 'pitch detect failed (need python3 + numpy): ' + e.message }, 501); }
+  if (!/^[0-9.]+$/.test(ratio)) ratio = '1.0';
+
+  const outId = 't_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const outFile = 'tag_' + outId + '.wav';
+  const outPath = path.join(DATA_DIR, outFile);
+  let af, suffix;
+  if (style === 'chipmunk') {
+    const p = (Number(ratio) * Math.pow(2, 10 / 12)).toFixed(5);
+    af = `rubberband=pitch=${p}:transients=crisp,atempo=1.12,chorus=0.6:0.9:50:0.4:0.3:2,highpass=f=120,acompressor=ratio=4,volume=3,alimiter=limit=0.95`;
+    suffix = ' (Chipmunk)';
+  } else if (style === 'hard') {
+    af = `rubberband=pitch=${ratio}:transients=crisp,chorus=0.7:0.9:45:0.5:0.3:2.4,chorus=0.6:0.85:25:0.4:0.22:1.6,highpass=f=90,acompressor=ratio=6,volume=3,alimiter=limit=0.95`;
+    suffix = ' (Hard Tune)';
+  } else {
+    af = `rubberband=pitch=${ratio}:transients=crisp,chorus=0.6:0.9:55:0.4:0.25:2,highpass=f=85,acompressor=ratio=3,volume=3,alimiter=limit=0.95`;
+    suffix = ' (Autotune)';
+  }
+  try { await run(FFMPEG, ['-y', '-i', srcPath, '-af', af, '-ar', '44100', '-ac', '1', '-c:a', 'pcm_s16le', outPath]); }
+  catch (e) { try { fs.unlinkSync(outPath); } catch {} return json(res, { error: 'ffmpeg autotune failed (need ffmpeg w/ rubberband): ' + e.message }, 501); }
+  let size = 0; try { size = fs.statSync(outPath).size; } catch {}
+  if (!size) { try { fs.unlinkSync(outPath); } catch {} return json(res, { error: 'autotune produced empty file' }, 500); }
+
+  const base = src.name.replace(/\s*\((Autotune|Hard Tune|Chipmunk)\)\s*$/i, '');
+  const name = (base + suffix).slice(0, 60);
+  cfg.tags.push({ id: outId, name, file: outFile, ext: 'wav', size, createdAt: Date.now(), skipRandom: false });
+  cfg.active = outId;
+  try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
+  json(res, { ok: true, id: outId, name, style, ratio: Number(ratio), ...pub(cfg) });
+}
+
+async function postTest(req, res) {
+  const b = (await readBody(req)) || {};
+  const cfg = normalize(readRaw());
+  let tag;
+  if (b.id) tag = cfg.tags.find((t) => t.id === String(b.id));
+  else if (cfg.mode === 'random' && cfg.tags.length) {
+    const pool = cfg.tags.filter((t) => !t.skipRandom);
+    const choose = pool.length ? pool : cfg.tags;
+    tag = choose[Math.floor(Math.random() * choose.length)];
+  } else tag = activeTag(cfg);
+  if (!tag) return json(res, { error: 'no sound' }, 404);
+  const p = path.join(DATA_DIR, tag.file);
+  if (!fs.existsSync(p)) return json(res, { error: 'missing file' }, 404);
+  if (process.platform !== 'darwin') return json(res, { error: 'afplay is macOS-only' }, 501);
+  try {
+    const { spawn } = require('child_process');
+    const c = spawn('afplay', ['-v', String(cfg.volume), p], { detached: true, stdio: 'ignore' });
+    c.unref();
+    json(res, { ok: true, played: tag.name, volume: cfg.volume });
+  } catch (e) { json(res, { error: 'play failed: ' + e.message }, 500); }
+}
+
+function serveIndex(res) {
+  fs.readFile(path.join(PUBLIC_DIR, 'index.html'), (err, buf) => {
+    if (err) { res.writeHead(500); return res.end('index.html missing'); }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(buf);
+  });
+}
+
+// ── router ───────────────────────────────────────────────────────────────
+const server = http.createServer((req, res) => {
+  const { pathname, query } = url.parse(req.url, true);
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' });
+    return res.end();
+  }
+  if (pathname === '/' || pathname === '/index.html') return serveIndex(res);
+  if (pathname === '/api/config' && req.method === 'GET') return getConfig(req, res);
+  if (pathname === '/api/config' && req.method === 'POST') return postConfig(req, res);
+  if (pathname === '/api/sound' && req.method === 'POST') return postSound(req, res);
+  if (pathname === '/api/sound' && req.method === 'GET') return getSound(req, res, query);
+  if (pathname === '/api/active' && req.method === 'POST') return postActive(req, res);
+  if (pathname === '/api/rename' && req.method === 'POST') return postRename(req, res);
+  if (pathname === '/api/delete' && req.method === 'POST') return postDelete(req, res);
+  if (pathname === '/api/skip' && req.method === 'POST') return postSkip(req, res);
+  if (pathname === '/api/autotune' && req.method === 'POST') return postAutotune(req, res);
+  if (pathname === '/api/test' && req.method === 'POST') return postTest(req, res);
+  res.writeHead(404, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ error: 'not found' }));
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  console.log('\n  Producer Tag  →  http://localhost:' + PORT);
+  console.log('  data: ' + DATA_DIR + '\n');
+});

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Producer Tag — plays your tag just before a push (the default trigger).
+# Runs in the background and always exits 0, so it never delays or blocks a push.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+bash "$DIR/producer-tag-play.sh" push
+exit 0

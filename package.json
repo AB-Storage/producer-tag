@@ -1,0 +1,34 @@
+{
+  "name": "producer-tag",
+  "version": "1.0.0",
+  "description": "Play your signature \"producer tag\" sound every time you commit or push to git. Record a library of tags, autotune them, and pick which one drops.",
+  "bin": {
+    "producer-tag": "server.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "install-hooks": "bash install.sh"
+  },
+  "keywords": [
+    "git",
+    "git-hooks",
+    "audio",
+    "producer-tag",
+    "afplay",
+    "autotune",
+    "developer-fun"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=14"
+  },
+  "os": [
+    "darwin"
+  ],
+  "files": [
+    "server.js",
+    "public/",
+    "hooks/",
+    "install.sh"
+  ]
+}

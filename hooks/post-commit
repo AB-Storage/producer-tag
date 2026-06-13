@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Producer Tag — plays your tag after a commit (off by default; enable "commit"
+# in the control panel). Non-blocking: always exits 0.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+bash "$DIR/producer-tag-play.sh" commit
+exit 0

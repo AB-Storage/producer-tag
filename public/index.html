@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Producer Tag</title>
+<style>
+  :root{
+    --background:#09090b; --surface:#18181b; --surfaceElevated:#1f1f23; --surfaceHover:#27272a;
+    --border:#3f3f46; --accent:#a78bfa; --accent2:#7c5cf0; --textPrimary:#e4e4e7; --textMuted:#71717a;
+    --danger:#ef4444; --success:#10b981; --warning:#f59e0b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:
+      radial-gradient(1100px 520px at 78% -8%, rgba(167,139,250,.14), transparent 60%),
+      radial-gradient(800px 480px at -5% 8%, rgba(124,92,240,.10), transparent 55%),
+      var(--background);
+    color:var(--textPrimary);min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.5;
+    padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+  }
+  .wrap{max-width:700px;margin:0 auto;padding:34px 20px 90px}
+
+  header.app{display:flex;align-items:center;gap:15px;margin-bottom:26px}
+  .logo{width:50px;height:50px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:flex;align-items:center;justify-content:center;flex:0 0 auto;box-shadow:0 8px 26px rgba(124,92,240,.4)}
+  .logo svg{width:27px;height:27px;color:#fff}
+  header.app h1{font-size:23px;font-weight:750;letter-spacing:-.025em}
+  header.app p{font-size:13px;color:var(--textMuted);margin-top:1px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:15px;
+    box-shadow:0 1px 0 rgba(255,255,255,.02) inset}
+  .card h2{font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.07em;color:var(--textMuted);
+    margin-bottom:15px;display:flex;align-items:center;gap:8px}
+  .card h2 svg{width:15px;height:15px;opacity:.9}
+  .card h2 .count{margin-left:auto;background:var(--surfaceElevated);border:1px solid var(--border);
+    border-radius:999px;padding:2px 9px;font-size:11px;color:var(--textMuted);letter-spacing:0}
+
+  /* segmented control (Fixed / Random) */
+  .seg{margin-left:auto;display:inline-flex;background:var(--surfaceElevated);border:1px solid var(--border);
+    border-radius:10px;padding:3px;gap:2px;letter-spacing:0}
+  .seg button{border:none;background:transparent;color:var(--textMuted);font-family:inherit;font-size:11.5px;font-weight:650;
+    text-transform:none;letter-spacing:0;padding:5px 11px;border-radius:8px;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:5px}
+  .seg button svg{width:13px;height:13px}
+  .seg button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 3px 10px rgba(124,92,240,.35)}
+  .seg button:not(.on):hover{color:var(--textPrimary)}
+
+  .row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+  .row+.row{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+  .row .label{font-size:15px;font-weight:550}
+  .row .sub{font-size:12px;color:var(--textMuted);margin-top:2px}
+
+  /* master */
+  .master{border-color:rgba(167,139,250,.55);background:linear-gradient(180deg,rgba(167,139,250,.10),rgba(167,139,250,.01))}
+  .master .state{font-size:13px;color:var(--textMuted);margin-top:3px;display:flex;align-items:center;gap:7px}
+  .led{width:9px;height:9px;border-radius:50%;background:var(--textMuted);box-shadow:0 0 0 0 rgba(16,185,129,0)}
+  .master.on .led{background:var(--success);animation:led 2s infinite}
+  @keyframes led{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{box-shadow:0 0 0 6px rgba(16,185,129,0)}}
+
+  /* switch */
+  .switch{position:relative;width:52px;height:30px;flex:0 0 auto;cursor:pointer}
+  .switch input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer}
+  .track{position:absolute;inset:0;background:var(--surfaceHover);border:1px solid var(--border);border-radius:999px;transition:.2s}
+  .thumb{position:absolute;top:3px;left:3px;width:22px;height:22px;background:#d4d4d8;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .switch input:checked ~ .track{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:var(--accent)}
+  .switch input:checked ~ .thumb{left:27px;background:#fff}
+  .switch input:disabled ~ .track{opacity:.4}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);
+    background:var(--surfaceElevated);color:var(--textPrimary);font-size:14px;font-weight:600;
+    padding:11px 15px;border-radius:11px;cursor:pointer;transition:.14s;font-family:inherit;white-space:nowrap}
+  .btn:hover:not(:disabled){background:var(--surfaceHover);border-color:#52525b;transform:translateY(-1px)}
+  .btn:active:not(:disabled){transform:translateY(0)}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn svg{width:16px;height:16px}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(124,92,240,.35)}
+  .btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+  .btn.rec{background:var(--danger);border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(239,68,68,.3)}
+  .btn.ghost{background:transparent}
+  .btn-row{display:flex;flex-wrap:wrap;gap:10px}
+
+  /* active tag card */
+  .active-card{position:relative;overflow:hidden}
+  .now{display:flex;align-items:center;gap:16px}
+  .now .play-lg{width:54px;height:54px;border-radius:15px;flex:0 0 auto;border:none;cursor:pointer;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 8px 22px rgba(124,92,240,.4);transition:.15s}
+  .now .play-lg:hover{transform:scale(1.05)}
+  .now .play-lg svg{width:24px;height:24px}
+  .now .info{flex:1;min-width:0}
+  .now .info .nm{font-size:18px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .now .info .mt{font-size:12px;color:var(--textMuted);margin-top:2px}
+  .wave{display:flex;align-items:center;gap:3px;height:26px;margin-top:10px}
+  .wave i{width:3px;border-radius:2px;background:linear-gradient(180deg,var(--accent),var(--accent2));opacity:.5;
+    animation:wv 1.2s ease-in-out infinite}
+  .active-card.playing .wave i{opacity:.95}
+  @keyframes wv{0%,100%{height:6px}50%{height:22px}}
+  .empty-now{display:flex;align-items:center;gap:13px;color:var(--textMuted)}
+  .empty-now svg{width:30px;height:30px;opacity:.5;flex:0 0 auto}
+
+  /* tag library list */
+  .tag-list{display:flex;flex-direction:column;gap:9px}
+  .tag{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:13px;
+    background:var(--surfaceElevated);border:1px solid var(--border);transition:.15s}
+  .tag:hover{border-color:#52525b;background:var(--surfaceHover)}
+  .tag.active{border-color:var(--accent);background:linear-gradient(180deg,rgba(167,139,250,.10),transparent)}
+  .tag .pick{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);flex:0 0 auto;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:.15s;background:transparent}
+  .tag.active .pick{border-color:var(--accent);background:var(--accent)}
+  .tag .pick svg{width:12px;height:12px;color:#fff;opacity:0;transition:.15s}
+  .tag.active .pick svg{opacity:1}
+  .tag .pp{width:36px;height:36px;border-radius:10px;flex:0 0 auto;border:1px solid var(--border);background:var(--surface);
+    color:var(--textPrimary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+  .tag .pp:hover{background:var(--surfaceHover);color:var(--accent)}
+  .tag .pp svg{width:15px;height:15px}
+  .tag .meta{flex:1;min-width:0}
+  .tag .meta .t{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tag .meta .d{font-size:11.5px;color:var(--textMuted);margin-top:1px;display:flex;gap:7px;align-items:center}
+  .tag .badge{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--accent);background:rgba(167,139,250,.14);
+    border:1px solid rgba(167,139,250,.3);border-radius:6px;padding:1px 6px;text-transform:uppercase}
+  .tag .acts{display:flex;gap:4px;flex:0 0 auto}
+  .icon-btn{width:32px;height:32px;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--textMuted);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.14s}
+  .icon-btn:hover{background:var(--surface);color:var(--textPrimary);border-color:var(--border)}
+  .icon-btn.del:hover{color:#fca5a5;border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.1)}
+  .icon-btn.at:hover{color:var(--accent);border-color:rgba(167,139,250,.4);background:rgba(167,139,250,.1)}
+  .icon-btn.skipped{color:var(--warning);opacity:.85}
+  .icon-btn svg{width:15px;height:15px}
+  .tag .badge.skip{color:var(--warning);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.32);margin-left:6px}
+
+  .at-style{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .at-style .at-label{font-size:12px;color:var(--textMuted);display:flex;align-items:center;gap:6px}
+  .at-style .at-label svg{width:14px;height:14px;color:var(--accent)}
+  .at-style .seg{margin-left:auto}
+
+  .empty{text-align:center;padding:26px 16px;color:var(--textMuted)}
+  .empty svg{width:38px;height:38px;opacity:.45;margin-bottom:10px}
+  .empty .t{font-size:14px;font-weight:600;color:var(--textPrimary)}
+  .empty .d{font-size:12.5px;margin-top:4px}
+
+  /* recorder */
+  .rec-panel{padding:18px;border-radius:14px;background:var(--surfaceElevated);border:1px solid var(--border)}
+  .rec-time{font-variant-numeric:tabular-nums;font-size:32px;font-weight:750;letter-spacing:-.02em;text-align:center;margin:2px 0 5px}
+  .rec-time.live{color:var(--danger)}
+  .rec-hint{text-align:center;font-size:12.5px;color:var(--textMuted);margin-bottom:15px}
+  .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-right:6px;vertical-align:middle;animation:p 1s infinite}
+  @keyframes p{0%,100%{opacity:1}50%{opacity:.25}}
+  .save-row{display:flex;gap:10px;margin-top:13px}
+  .save-row input{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--textPrimary);
+    font-size:14px;padding:11px 13px;font-family:inherit;outline:none;transition:.15s}
+  .save-row input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(167,139,250,.18)}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:150px;height:5px;border-radius:999px;background:var(--surfaceHover);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:2px solid var(--background);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+  .vol-val{font-size:13px;color:var(--textMuted);font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+
+  .hint{font-size:12px;color:var(--textMuted);margin-top:8px;line-height:1.65}
+  .hint code{background:var(--surfaceElevated);border:1px solid var(--border);border-radius:5px;padding:1px 6px;font-size:11px;color:var(--accent)}
+  .dim{opacity:.42;pointer-events:none;transition:.2s}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:flex;align-items:center;
+    justify-content:center;padding:20px;z-index:60;opacity:0;pointer-events:none;transition:.2s}
+  .modal-bg.show{opacity:1;pointer-events:auto}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:22px;width:100%;max-width:380px;
+    transform:scale(.96);transition:.2s;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .modal-bg.show .modal{transform:scale(1)}
+  .modal h3{font-size:17px;font-weight:700;margin-bottom:6px}
+  .modal p{font-size:13px;color:var(--textMuted);margin-bottom:16px}
+  .modal input{width:100%;background:var(--surfaceElevated);border:1px solid var(--border);border-radius:11px;color:var(--textPrimary);
+    font-size:15px;padding:12px 14px;font-family:inherit;outline:none;margin-bottom:16px}
+  .modal input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(167,139,250,.18)}
+  .modal .acts{display:flex;gap:10px;justify-content:flex-end}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:var(--surfaceElevated);border:1px solid var(--border);color:var(--textPrimary);
+    padding:12px 18px;border-radius:12px;font-size:14px;font-weight:550;transition:.25s;pointer-events:none;z-index:70;
+    box-shadow:0 14px 36px rgba(0,0,0,.55);max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{border-color:var(--danger);color:#fca5a5}
+  #toast.ok{border-color:var(--success);color:#6ee7b7}
+  audio{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+      </svg>
+    </div>
+    <div>
+      <h1>Producer Tag</h1>
+      <p>Drop your signature sound every time you push to GitHub</p>
+    </div>
+  </header>
+
+  <!-- MASTER -->
+  <div class="card master" id="masterCard">
+    <div class="row">
+      <div>
+        <div class="label">Producer Tag</div>
+        <div class="state"><span class="led"></span><span id="masterState">Loading&hellip;</span></div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="enabledToggle">
+        <span class="track"></span><span class="thumb"></span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ACTIVE / NOW PLAYING -->
+  <div class="card active-card" id="activeCard">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Now dropping
+      <span class="seg" id="modeSeg">
+        <button data-mode="fixed" title="Always play the tag you pick">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Fixed
+        </button>
+        <button data-mode="random" title="Surprise — random tag each push">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          Random
+        </button>
+      </span>
+    </h2>
+    <div id="activeBody"><!-- filled by render --></div>
+  </div>
+
+  <!-- LIBRARY -->
+  <div class="card" id="libCard">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      Your Tags <span class="count" id="tagCount">0</span>
+    </h2>
+    <div class="at-style">
+      <span class="at-label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3l1.9 4.6L19.5 9l-4.6 1.9L13 15.5l-1.9-4.6L6.5 9l4.6-1.4L13 3z"/></svg>
+        Autotune style
+      </span>
+      <span class="seg" id="styleSeg">
+        <button data-style="subtle" title="Gentle tune to the nearest note">Subtle</button>
+        <button data-style="hard" title="Heavy T-Pain style">Hard</button>
+        <button data-style="chipmunk" title="Funny super-pitched chipmunk">Chipmunk</button>
+      </span>
+    </div>
+    <div class="tag-list" id="tagList"></div>
+  </div>
+
+  <!-- ADD: RECORD + UPLOAD -->
+  <div class="card" id="addCard">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+      Add a tag
+    </h2>
+    <div class="rec-panel">
+      <div class="rec-time" id="recTime">0:00</div>
+      <div class="rec-hint" id="recHint">Tap record and say your tag</div>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn rec" id="recBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg>
+          Record
+        </button>
+        <button class="btn ghost" id="prevRecBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>
+          Preview
+        </button>
+      </div>
+      <div class="save-row" id="saveRow" style="display:none">
+        <input type="text" id="recName" placeholder="Name this tag (e.g. Another One)" maxlength="60">
+        <button class="btn primary" id="saveRecBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          Save
+        </button>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:13px">
+      <button class="btn" id="uploadBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload a sound file
+      </button>
+      <input type="file" id="fileInput" accept=".wav,.mp3,.m4a,.aac,.aiff,.caf,audio/wav,audio/mpeg,audio/mp4,audio/aac" hidden>
+    </div>
+    <div class="hint">Recordings save as <code>.wav</code> so macOS <code>afplay</code> (the git hook) can play them. Uploads: wav, mp3, m4a, aac, aiff, caf.</div>
+  </div>
+
+  <!-- TRIGGERS -->
+  <div class="card" id="triggerCard">
+    <h2>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+      When it plays
+    </h2>
+    <div class="row">
+      <div><div class="label">On push</div><div class="sub">Plays just before code goes up to GitHub</div></div>
+      <label class="switch"><input type="checkbox" id="pushToggle"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div class="row">
+      <div><div class="label">On commit</div><div class="sub">Plays after every local commit</div></div>
+      <label class="switch"><input type="checkbox" id="commitToggle"><span class="track"></span><span class="thumb"></span></label>
+    </div>
+    <div class="row">
+      <div><div class="label">Volume</div><div class="sub">Applied by afplay when the tag fires</div></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <input type="range" id="volRange" min="0" max="2" step="0.05" value="1">
+        <span class="vol-val" id="volVal">100%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Git hooks (<code>post-commit</code>, <code>pre-push</code>) read <code>~/.producer-tag/config.json</code> and play the
+    active tag in the background &mdash; they never block git. Install them in any repo with
+    <code>bash install.sh</code> from the producer-tag folder.
+  </div>
+</div>
+
+<!-- name/rename modal -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Name this tag</h3>
+    <p id="modalDesc">Give it a name you'll recognize.</p>
+    <input type="text" id="modalInput" maxlength="60" placeholder="Tag name">
+    <div class="acts">
+      <button class="btn ghost" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalOk">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<audio id="player"></audio>
+
+<script>
+const $ = id => document.getElementById(id);
+const API = '/api';
+let state = { enabled:true, volume:1, events:{commit:false,push:true}, active:null, tags:[] };
+let recordedBlob = null;
+let atStyle = 'chipmunk';   // autotune style: subtle | hard | chipmunk
+
+function toast(msg, kind){
+  const t = $('toast'); t.textContent = msg; t.className = 'show' + (kind ? ' '+kind : '');
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.className='', 2600);
+}
+function fmtBytes(b){ if(!b) return '0 B'; if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(0)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+function esc(s){ const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ---------- modal (returns a Promise<string|null>) ----------
+let modalResolve = null;
+function askName(title, desc, initial){
+  $('modalTitle').textContent = title; $('modalDesc').textContent = desc;
+  const inp = $('modalInput'); inp.value = initial||'';
+  $('modalBg').classList.add('show'); setTimeout(()=>{ inp.focus(); inp.select(); },60);
+  return new Promise(res=>{ modalResolve = res; });
+}
+function closeModal(val){ $('modalBg').classList.remove('show'); if(modalResolve){ modalResolve(val); modalResolve=null; } }
+$('modalCancel').onclick = ()=>closeModal(null);
+$('modalOk').onclick = ()=>closeModal($('modalInput').value.trim());
+$('modalInput').addEventListener('keydown', e=>{ if(e.key==='Enter') closeModal(e.target.value.trim()); if(e.key==='Escape') closeModal(null); });
+$('modalBg').addEventListener('click', e=>{ if(e.target===$('modalBg')) closeModal(null); });
+
+// ---------- load + render ----------
+async function load(){
+  try{ const r = await fetch(API+'/config'); state = await r.json(); }
+  catch(e){ toast('Server not reachable — is it running?','err'); return; }
+  render();
+}
+function render(){
+  // master
+  $('enabledToggle').checked = !!state.enabled;
+  $('masterCard').classList.toggle('on', !!state.enabled);
+  $('masterState').textContent = state.enabled ? 'ON — your tag drops on git events' : 'OFF — silent';
+
+  // triggers + volume
+  $('pushToggle').checked = !!(state.events&&state.events.push);
+  $('commitToggle').checked = !!(state.events&&state.events.commit);
+  $('volRange').value = state.volume!=null?state.volume:1;
+  $('volVal').textContent = Math.round((state.volume!=null?state.volume:1)*100)+'%';
+  $('triggerCard').classList.toggle('dim', !state.enabled);
+  $('activeCard').classList.toggle('dim', !state.enabled);
+
+  // play mode segmented control
+  const mode = state.mode==='random'?'random':'fixed';
+  $('modeSeg').querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.mode===mode));
+  // autotune style segmented control
+  $('styleSeg').querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.style===atStyle));
+
+  renderActive();
+  renderList();
+}
+function renderActive(){
+  const body = $('activeBody');
+  // RANDOM mode — surprise from the whole library
+  if(state.mode==='random' && state.tags.length){
+    let bars=''; const hs=[10,18,8,22,14,20,9,16,12,21,7,17,13,19,11];
+    for(const h of hs) bars += '<i style="height:'+h+'px;animation-delay:'+(Math.random()*1.2).toFixed(2)+'s"></i>';
+    body.innerHTML =
+      '<div class="now">'+
+        '<div class="play-lg" style="cursor:default"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></div>'+
+        '<div class="info"><div class="nm">Random</div>'+
+        '<div class="mt">A surprise tag from your '+state.tags.length+' &middot; new one each push</div>'+
+        '<div class="wave">'+bars+'</div></div>'+
+        '<button class="btn primary" id="activeTest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Roll one</button>'+
+      '</div>';
+    $('activeTest').onclick = ()=> testTag();
+    return;
+  }
+  const t = state.tags.find(x=>x.id===state.active);
+  if(!t){
+    body.innerHTML = '<div class="empty-now">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'+
+      '<div><div style="font-weight:600;color:var(--textPrimary)">No tag selected</div>'+
+      '<div style="font-size:12.5px">Record or upload one below, then pick it.</div></div></div>';
+    return;
+  }
+  let bars=''; const hs=[10,18,8,22,14,20,9,16,12,21,7,17,13,19,11];
+  for(const h of hs) bars += '<i style="height:'+h+'px;animation-delay:'+(Math.random()*1.2).toFixed(2)+'s"></i>';
+  body.innerHTML =
+    '<div class="now">'+
+      '<button class="play-lg" id="activePlay" title="Preview"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></button>'+
+      '<div class="info"><div class="nm">'+esc(t.name)+'</div>'+
+      '<div class="mt">'+t.ext.toUpperCase()+' &middot; '+fmtBytes(t.size)+'</div>'+
+      '<div class="wave">'+bars+'</div></div>'+
+      '<button class="btn primary" id="activeTest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>Test</button>'+
+    '</div>';
+  $('activePlay').onclick = ()=> previewTag(t.id, true);
+  $('activeTest').onclick = ()=> testTag();
+}
+function renderList(){
+  $('tagCount').textContent = state.tags.length;
+  const list = $('tagList');
+  if(!state.tags.length){
+    list.innerHTML = '<div class="empty">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>'+
+      '<div class="t">No tags yet</div><div class="d">Record your first producer tag below.</div></div>';
+    return;
+  }
+  list.innerHTML = state.tags.map(t=>{
+    const on = t.id===state.active;
+    return '<div class="tag'+(on?' active':'')+'" data-id="'+t.id+'">'+
+      '<button class="pick" data-act="pick" title="Set active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>'+
+      '<button class="pp" data-act="play" title="Preview"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg></button>'+
+      '<div class="meta"><div class="t">'+esc(t.name)+(on?' <span class="badge">Active</span>':'')+(t.skipRandom?' <span class="badge skip">No random</span>':'')+'</div>'+
+      '<div class="d">'+t.ext.toUpperCase()+' &middot; '+fmtBytes(t.size)+'</div></div>'+
+      '<div class="acts">'+
+        '<button class="icon-btn at" data-act="autotune" title="Autotune — adds a tuned copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3l1.9 4.6L19.5 9l-4.6 1.9L13 15.5l-1.9-4.6L6.5 9l4.6-1.4L13 3z"/><path d="M5 14v4M3 16h4M18 15v3M16.5 16.5h3"/></svg></button>'+
+        '<button class="icon-btn'+(t.skipRandom?' skipped':'')+'" data-act="skip" title="'+(t.skipRandom?'Excluded from Random — click to include':'In Random — click to exclude')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg></button>'+
+        '<button class="icon-btn" data-act="rename" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>'+
+        '<button class="icon-btn del" data-act="delete" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>'+
+      '</div></div>';
+  }).join('');
+  list.querySelectorAll('.tag').forEach(el=>{
+    const id = el.dataset.id;
+    el.querySelectorAll('[data-act]').forEach(b=>{
+      b.onclick = ev=>{ ev.stopPropagation();
+        const a=b.dataset.act;
+        if(a==='pick') setActive(id);
+        else if(a==='play') previewTag(id, false);
+        else if(a==='autotune') autotuneTag(id, b);
+        else if(a==='skip') toggleSkip(id);
+        else if(a==='rename') renameTag(id);
+        else if(a==='delete') deleteTag(id);
+      };
+    });
+    // click the row body (not buttons) to set active
+    el.onclick = ()=> setActive(id);
+  });
+}
+
+// ---------- actions ----------
+async function setActive(id){
+  if(id===state.active) return;
+  try{ const r=await fetch(API+'/active',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    const d=await r.json(); if(d.ok){ state=d; render(); toast('Active tag set','ok'); } else toast(d.error||'Failed','err'); }
+  catch(e){ toast('Failed','err'); }
+}
+async function renameTag(id){
+  const t = state.tags.find(x=>x.id===id); if(!t) return;
+  const name = await askName('Rename tag', 'Pick a name you’ll recognize.', t.name);
+  if(name==null) return; if(!name){ toast('Name required','err'); return; }
+  try{ const r=await fetch(API+'/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,name})});
+    const d=await r.json(); if(d.ok){ state=d; render(); toast('Renamed','ok'); } else toast(d.error||'Failed','err'); }
+  catch(e){ toast('Failed','err'); }
+}
+async function deleteTag(id){
+  const t = state.tags.find(x=>x.id===id); if(!t) return;
+  const ok = await askName('Delete "'+t.name+'"?', 'Type DELETE to confirm. This removes the sound file.', '');
+  if(ok==null) return; if(String(ok).trim().toUpperCase()!=='DELETE'){ toast('Not deleted','err'); return; }
+  try{ const r=await fetch(API+'/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});
+    const d=await r.json(); if(d.ok){ state=d; render(); toast('Deleted','ok'); } else toast(d.error||'Failed','err'); }
+  catch(e){ toast('Failed','err'); }
+}
+async function toggleSkip(id){
+  const t = state.tags.find(x=>x.id===id); if(!t) return;
+  const willSkip = !t.skipRandom;
+  try{ const r=await fetch(API+'/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id, skip:willSkip})});
+    const d=await r.json(); if(d.ok){ state=d; render(); toast(willSkip?'Excluded from Random':'Back in the shuffle','ok'); } else toast(d.error||'Failed','err'); }
+  catch(e){ toast('Failed','err'); }
+}
+async function autotuneTag(id, btn){
+  if(btn){ btn.disabled=true; btn.style.opacity=.4; }
+  toast((atStyle==='chipmunk'?'Chipmunking':'Autotuning')+'… a few seconds');
+  try{ const r=await fetch(API+'/autotune',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id, style:atStyle})});
+    const d=await r.json();
+    if(d.ok){ state=d; render(); toast('Autotuned tag added & set active','ok'); }
+    else toast(d.error||'Autotune failed','err'); }
+  catch(e){ toast('Autotune failed','err'); }
+  finally{ if(btn){ btn.disabled=false; btn.style.opacity=''; } }
+}
+function previewTag(id, fromActive){
+  const p = $('player'); p.src = API+'/sound?id='+encodeURIComponent(id)+'&t='+Date.now();
+  if(fromActive) $('activeCard').classList.add('playing');
+  p.onended = ()=> $('activeCard').classList.remove('playing');
+  p.play().catch(()=>toast('Could not play preview','err'));
+}
+async function testTag(){
+  try{ const r=await fetch(API+'/test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const d=await r.json(); if(d.ok) toast('Playing through your speakers','ok'); else toast(d.error||'Test failed','err'); }
+  catch(e){ toast('Test failed','err'); }
+}
+
+// ---------- config writes ----------
+async function postConfig(patch){
+  try{ const r=await fetch(API+'/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patch)});
+    state = await r.json(); render(); }
+  catch(e){ toast('Save failed','err'); }
+}
+$('enabledToggle').addEventListener('change', e=>{ postConfig({enabled:e.target.checked}); toast(e.target.checked?'Producer tag ON':'Producer tag OFF','ok'); });
+$('pushToggle').addEventListener('change', e=> postConfig({events:{push:e.target.checked}}) );
+$('commitToggle').addEventListener('change', e=> postConfig({events:{commit:e.target.checked}}) );
+let volT;
+$('volRange').addEventListener('input', e=>{ $('volVal').textContent=Math.round(e.target.value*100)+'%'; clearTimeout(volT); volT=setTimeout(()=>postConfig({volume:parseFloat(e.target.value)}),300); });
+$('modeSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+  const m = b.dataset.mode; if(m===(state.mode||'fixed')) return;
+  postConfig({mode:m}); toast(m==='random'?'Random mode — surprise each push':'Fixed — plays your chosen tag','ok');
+}));
+$('styleSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+  atStyle = b.dataset.style;
+  $('styleSeg').querySelectorAll('button').forEach(x=> x.classList.toggle('on', x.dataset.style===atStyle));
+  toast('Autotune style: '+b.textContent);
+}));
+
+// ---------- recorder (mic -> WAV) ----------
+let audioCtx, sourceNode, processor, silentGain, micStream, recBuffers=[], recLen=0, recRate=44100, recTimer, recStart=0, recording=false;
+function fmtTime(s){ const m=Math.floor(s/60), ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
+async function startRec(){
+  try{ micStream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ toast('Mic permission denied','err'); return; }
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended') await audioCtx.resume();
+  recRate = audioCtx.sampleRate; recBuffers=[]; recLen=0;
+  sourceNode = audioCtx.createMediaStreamSource(micStream);
+  processor = audioCtx.createScriptProcessor(4096,1,1);
+  processor.onaudioprocess = e=>{ const ch=e.inputBuffer.getChannelData(0); recBuffers.push(new Float32Array(ch)); recLen+=ch.length; };
+  silentGain = audioCtx.createGain(); silentGain.gain.value = 0;
+  sourceNode.connect(processor); processor.connect(silentGain); silentGain.connect(audioCtx.destination);
+  recording=true; recStart=Date.now(); recordedBlob=null;
+  $('recBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg> Stop';
+  $('recTime').classList.add('live'); $('recHint').innerHTML = '<span class="pulse"></span>Recording&hellip;';
+  $('prevRecBtn').disabled = true; $('saveRow').style.display='none';
+  recTimer = setInterval(()=>{ $('recTime').textContent = fmtTime((Date.now()-recStart)/1000); },200);
+}
+function stopRec(){
+  recording=false; clearInterval(recTimer); $('recTime').classList.remove('live');
+  try{ processor.disconnect(); sourceNode.disconnect(); silentGain.disconnect(); }catch(e){}
+  if(micStream) micStream.getTracks().forEach(t=>t.stop());
+  const merged = mergeBuffers(recBuffers, recLen);
+  if(merged.length < recRate*0.2){ toast('Recording too short','err'); resetRecUI(); return; }
+  recordedBlob = new Blob([encodeWAV(merged, recRate)], {type:'audio/wav'});
+  $('recBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg> Re-record';
+  $('recHint').textContent = 'Preview it, name it, then save to your library';
+  $('prevRecBtn').disabled = false; $('saveRow').style.display='flex'; $('recName').focus();
+}
+function resetRecUI(){
+  $('recBtn').innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="7"/></svg> Record';
+  $('recTime').textContent='0:00'; $('recHint').textContent='Tap record and say your tag';
+  $('prevRecBtn').disabled=true; $('saveRow').style.display='none'; $('recName').value='';
+}
+$('recBtn').addEventListener('click', ()=>{ recording ? stopRec() : startRec(); });
+$('prevRecBtn').addEventListener('click', ()=>{ if(!recordedBlob) return; const p=$('player'); p.src=URL.createObjectURL(recordedBlob); p.play().catch(()=>{}); });
+$('saveRecBtn').addEventListener('click', async ()=>{
+  if(!recordedBlob) return;
+  const name = $('recName').value.trim();
+  $('saveRecBtn').disabled = true;
+  const b64 = await blobToB64(recordedBlob);
+  await saveSound(b64, 'wav', name);
+  recordedBlob=null; resetRecUI(); $('saveRecBtn').disabled=false;
+});
+
+// ---------- upload ----------
+$('uploadBtn').addEventListener('click', ()=> $('fileInput').click());
+$('fileInput').addEventListener('change', async e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const ext = (f.name.split('.').pop()||'').toLowerCase();
+  const ALLOWED = ['wav','mp3','m4a','aac','aiff','caf'];
+  if(!ALLOWED.includes(ext)){ toast('Unsupported format (wav/mp3/m4a/aac/aiff/caf)','err'); e.target.value=''; return; }
+  if(f.size > 10*1024*1024){ toast('File too large (max 10MB)','err'); e.target.value=''; return; }
+  const dflt = f.name.replace(/\.[^.]+$/,'').slice(0,60);
+  const name = await askName('Name this tag', 'From '+esc(f.name), dflt);
+  if(name==null){ e.target.value=''; return; }
+  const b64 = await blobToB64(f);
+  await saveSound(b64, ext, name||dflt);
+  e.target.value='';
+});
+
+async function saveSound(b64, ext, name){
+  try{
+    const r = await fetch(API+'/sound',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contentB64:b64, ext, name})});
+    const d = await r.json();
+    if(d.ok){ toast('Tag saved & set active','ok'); await load(); }
+    else toast(d.error||'Save failed','err');
+  }catch(e){ toast('Save failed','err'); }
+}
+
+// ---------- helpers ----------
+function blobToB64(blob){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result).split(',')[1]); fr.onerror=rej; fr.readAsDataURL(blob); }); }
+function mergeBuffers(buffers, len){ const out=new Float32Array(len); let off=0; for(const b of buffers){ out.set(b,off); off+=b.length; } return out; }
+function encodeWAV(samples, sampleRate){
+  const buffer=new ArrayBuffer(44+samples.length*2), view=new DataView(buffer);
+  const w=(o,s)=>{ for(let i=0;i<s.length;i++) view.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,'RIFF'); view.setUint32(4,36+samples.length*2,true); w(8,'WAVE'); w(12,'fmt ');
+  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true);
+  view.setUint32(24,sampleRate,true); view.setUint32(28,sampleRate*2,true); view.setUint16(32,2,true); view.setUint16(34,16,true);
+  w(36,'data'); view.setUint32(40,samples.length*2,true);
+  let off=44; for(let i=0;i<samples.length;i++){ const s=Math.max(-1,Math.min(1,samples[i])); view.setInt16(off, s<0?s*0x8000:s*0x7FFF, true); off+=2; }
+  return buffer;
+}
+
+load();
+</script>
+</body>
+</html>
