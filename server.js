@@ -52,12 +52,13 @@ function normalize(raw) {
     mode: raw.mode === 'random' ? 'random' : 'fixed',
     notify: raw.notify !== false,                   // desktop notification; default ON
     events: { commit: !!(raw.events && raw.events.commit), push: raw.events ? !!raw.events.push : true },
-    repos: {},                                       // per-repo mute: { name: false } = silent there
+    repoMode: raw.repoMode === 'only' ? 'only' : 'all', // 'all' = play everywhere except muted; 'only' = allowlist
+    repos: {},                                       // explicit per-repo: { name: true|false }
     active: raw.active != null ? String(raw.active) : null,
     tags: [],
   };
   if (raw.repos && typeof raw.repos === 'object') {
-    for (const k in raw.repos) if (raw.repos[k] === false) cfg.repos[String(k)] = false;
+    for (const k in raw.repos) if (typeof raw.repos[k] === 'boolean') cfg.repos[String(k)] = raw.repos[k];
   }
   const seen = new Set();
   if (Array.isArray(raw.tags)) {
@@ -85,7 +86,7 @@ function write(cfg) {
   const a = activeTag(cfg);
   fs.writeFileSync(CFG_FILE, JSON.stringify({
     enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
-    repos: cfg.repos,
+    repoMode: cfg.repoMode, repos: cfg.repos,
     active: cfg.active, sound: a ? a.file : '',
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, file: t.file, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   }, null, 2));
@@ -94,7 +95,7 @@ function pub(cfg) {
   const a = activeTag(cfg);
   return {
     ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
-    repos: cfg.repos,
+    repoMode: cfg.repoMode, repos: cfg.repos,
     active: cfg.active, hasSound: !!a, soundSize: a ? a.size : 0,
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   };
@@ -109,6 +110,7 @@ async function postConfig(req, res) {
   const cfg = normalize(readRaw());
   if (typeof b.enabled === 'boolean') cfg.enabled = b.enabled;
   if (typeof b.notify === 'boolean') cfg.notify = b.notify;
+  if (b.repoMode != null) cfg.repoMode = b.repoMode === 'only' ? 'only' : 'all';
   if (b.volume != null) cfg.volume = Math.max(0, Math.min(2, Number(b.volume) || 1.0));
   if (b.mode != null) cfg.mode = b.mode === 'random' ? 'random' : 'fixed';
   if (b.events) {
@@ -314,8 +316,9 @@ function getHistory(req, res) {
   const names = new Set();
   lines.forEach((l) => { const r = l.split('\t')[2]; if (r) names.add(r); });
   Object.keys(cfg.repos).forEach((r) => names.add(r));
-  const repos = [...names].filter((n) => n && n !== '(unknown)').sort().map((name) => ({ name, enabled: cfg.repos[name] !== false }));
-  json(res, { ok: true, plays, count: lines.length, repos });
+  const willPlay = (name) => cfg.repoMode === 'only' ? cfg.repos[name] === true : cfg.repos[name] !== false;
+  const repos = [...names].filter((n) => n && n !== '(unknown)').sort().map((name) => ({ name, enabled: willPlay(name) }));
+  json(res, { ok: true, plays, count: lines.length, repoMode: cfg.repoMode, repos });
 }
 
 // POST /api/repo { repo, enabled } — mute/unmute the tag for a specific repo
@@ -324,8 +327,7 @@ async function postRepo(req, res) {
   const repo = b && b.repo != null ? String(b.repo).trim() : '';
   if (!repo) return json(res, { error: 'repo required' }, 400);
   const cfg = normalize(readRaw());
-  if (b.enabled === false) cfg.repos[repo] = false;   // mute this repo
-  else delete cfg.repos[repo];                         // un-mute (default = plays)
+  cfg.repos[repo] = b.enabled === true;   // store the explicit play/silent state
   try { write(cfg); } catch (e) { return json(res, { error: 'write failed: ' + e.message }, 500); }
   json(res, { ok: true, repos: cfg.repos });
 }

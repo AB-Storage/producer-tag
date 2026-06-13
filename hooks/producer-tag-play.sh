@@ -35,8 +35,10 @@ except Exception:
     print("0 0 0 1.0 - 0"); sys.exit(0)
 enabled  = 1 if c.get("enabled") else 0
 event_on = 1 if (c.get("events", {}) or {}).get(event) else 0
-# Per-repo: plays unless this repo is explicitly turned off.
-repo_on  = 0 if (c.get("repos", {}) or {}).get(repo) is False else 1
+# Per-repo: "all" mode plays everywhere except muted (==False); "only" mode
+# plays solely in repos explicitly allowed (==True).
+_rval = (c.get("repos", {}) or {}).get(repo)
+repo_on  = (1 if _rval is True else 0) if c.get("repoMode") == "only" else (0 if _rval is False else 1)
 notify   = 1 if c.get("notify") else 0
 try:
     vol = float(c.get("volume", 1.0))

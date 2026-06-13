@@ -427,11 +427,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
       Repositories <span class="count" id="repoCount">0</span>
     </h2>
-    <p class="hint" style="margin-top:-6px;margin-bottom:14px">Mute the sound on specific repos — it keeps playing everywhere else.</p>
+    <p class="hint" id="repoHint" style="margin-top:-6px;margin-bottom:14px">Choose where your tag plays.</p>
+    <div class="at-style" style="margin:0 0 16px">
+      <span class="at-label">Play in</span>
+      <span class="seg" id="repoModeSeg" role="group" aria-label="Repo play mode">
+        <button data-rmode="all" title="Every repo, minus the ones you mute">All repos</button>
+        <button data-rmode="only" title="Only the repos you turn on">Only selected</button>
+      </span>
+    </div>
     <div id="repoList"></div>
     <div class="add-repo">
-      <input type="text" id="repoInput" maxlength="80" placeholder="Mute a repo by name (e.g. work-private)" aria-label="Repo name to mute">
-      <button class="btn" id="repoAdd">Mute</button>
+      <input type="text" id="repoInput" maxlength="80" placeholder="Add a repo by name" aria-label="Repo name">
+      <button class="btn" id="repoAdd">Add</button>
     </div>
   </div>
 
@@ -870,7 +877,7 @@ function ago(ts){ if(!ts) return ''; const s=Math.floor((Date.now()-ts)/1000);
   if(s<60) return s+'s ago'; if(s<3600) return Math.floor(s/60)+'m ago'; if(s<86400) return Math.floor(s/3600)+'h ago'; return Math.floor(s/86400)+'d ago'; }
 async function loadHistory(){
   let d; try{ d=await (await fetch(API+'/history')).json(); }catch(e){ return; }
-  renderRepos(d.repos||[]);
+  renderRepos(d.repos||[], d.repoMode||'all');
   $('playCount').textContent = d.count||0;
   const list = $('activityList');
   if(!d.plays||!d.plays.length){ list.innerHTML='<div class="act-empty">No plays yet. Push to a repo with the hooks installed and it shows up here.</div>'; return; }
@@ -882,29 +889,42 @@ async function loadHistory(){
       '<span class="ar-when">'+ago(p.ts)+'</span></div>';
   }).join('');
 }
-function renderRepos(repos){
+let repoMode='all';
+function renderRepos(repos, mode){
+  repoMode = mode==='only'?'only':'all';
+  $('repoModeSeg').querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.rmode===repoMode));
+  $('repoHint').textContent = repoMode==='only'
+    ? 'Silent everywhere except the repos you turn on below.'
+    : 'Plays in every repo — turn one off to mute it there.';
+  $('repoInput').placeholder = repoMode==='only' ? 'Allow a repo by name' : 'Mute a repo by name';
+  $('repoAdd').textContent = repoMode==='only' ? 'Allow' : 'Mute';
   $('repoCount').textContent=repos.length;
   const list=$('repoList');
-  if(!repos.length){ list.innerHTML='<div class="act-empty" style="padding:6px 0 2px">Repos show up here after their first push — or add one below to mute it ahead of time.</div>'; return; }
-  list.innerHTML = repos.map(r=>
-    '<div class="row"><div><div class="label">'+esc(r.name)+'</div>'+
-    '<div class="sub">'+(r.enabled?'Plays your tag here':'Muted — silent here')+'</div></div>'+
-    '<label class="switch"><input type="checkbox" aria-label="Sound for '+esc(r.name)+'" data-repo="'+encodeURIComponent(r.name)+'"'+(r.enabled?' checked':'')+'>'+
-    '<span class="track"></span><span class="thumb"></span></label></div>'
-  ).join('');
+  if(!repos.length){ list.innerHTML='<div class="act-empty" style="padding:6px 0 2px">Repos appear here after their first push — or add one by name below.</div>'; return; }
+  list.innerHTML = repos.map(r=>{
+    const sub = r.enabled ? 'Plays your tag here' : (repoMode==='only'?'Not selected — silent':'Muted — silent here');
+    return '<div class="row"><div><div class="label">'+esc(r.name)+'</div><div class="sub">'+sub+'</div></div>'+
+      '<label class="switch"><input type="checkbox" aria-label="Sound for '+esc(r.name)+'" data-repo="'+encodeURIComponent(r.name)+'"'+(r.enabled?' checked':'')+'>'+
+      '<span class="track"></span><span class="thumb"></span></label></div>';
+  }).join('');
   $('repoList').querySelectorAll('input[data-repo]').forEach(inp=> inp.onchange=()=> setRepo(decodeURIComponent(inp.dataset.repo), inp.checked));
 }
 async function setRepo(repo, enabled){
   try{
     const r=await fetch(API+'/repo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repo,enabled})});
     const d=await r.json();
-    if(d.ok){ toast(enabled?('Sound on for '+repo):('Muted '+repo),'ok'); loadHistory(); }
+    if(d.ok){ toast((enabled?'Sound on for ':'Muted ')+repo,'ok'); loadHistory(); }
     else toast(d.error||'Failed','err');
   }catch(e){ toast('Failed','err'); }
 }
-function addRepoMute(){ const n=$('repoInput').value.trim(); if(!n) return; $('repoInput').value=''; setRepo(n, false); }
-$('repoAdd').addEventListener('click', addRepoMute);
-$('repoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addRepoMute(); });
+function addRepoByName(){ const n=$('repoInput').value.trim(); if(!n) return; $('repoInput').value=''; setRepo(n, repoMode==='only'); }
+$('repoAdd').addEventListener('click', addRepoByName);
+$('repoInput').addEventListener('keydown', e=>{ if(e.key==='Enter') addRepoByName(); });
+$('repoModeSeg').querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+  const m=b.dataset.rmode; if(m===repoMode) return;
+  fetch(API+'/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({repoMode:m})})
+    .then(()=>{ toast(m==='only'?'Only selected repos play':'All repos play','ok'); loadHistory(); }).catch(()=>toast('Failed','err'));
+}));
 setInterval(loadHistory, 8000);
 
 // ========================= AUDIO EDITOR =========================
