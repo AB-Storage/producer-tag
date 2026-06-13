@@ -145,6 +145,9 @@ All JSON, served at `http://localhost:7777`:
 - `POST /api/repo {repo, enabled}` — mute/unmute the tag for one repo
 - `POST /api/scan {dir}` — find git repos under a folder and register them in the panel
 
+> Safety: `scan` and `extract`'s `path` only accept folders/files **inside the user's home
+> directory** (symlinks resolved). The server is localhost-only and makes no outbound calls.
+
 ## Controlling which repos play
 
 By default the tag plays in **every** repo. The **Repositories** panel lets the user

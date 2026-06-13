@@ -332,6 +332,14 @@ async function postRepo(req, res) {
   json(res, { ok: true, repos: cfg.repos });
 }
 
+// Defense-in-depth: typed paths must resolve inside the user's home dir
+// (symlinks resolved, so they can't escape). The server is localhost-only, but
+// this limits what a stray request could ever read/enumerate.
+function insideHome(p) {
+  try { const real = fs.realpathSync(p); const home = fs.realpathSync(os.homedir()); return real === home || real.startsWith(home + path.sep); }
+  catch { return false; }
+}
+
 // Find git repos under a folder (a dir containing a .git folder), bounded.
 function findRepos(root, maxDepth) {
   const out = []; const stack = [[root, 0]];
@@ -356,6 +364,7 @@ async function postScan(req, res) {
   dir = dir.replace(/^~(?=[/\\])/, os.homedir());
   let st; try { st = fs.statSync(dir); } catch { return json(res, { error: 'folder not found: ' + dir }, 404); }
   if (!st.isDirectory()) return json(res, { error: 'not a folder: ' + dir }, 400);
+  if (!insideHome(dir)) return json(res, { error: 'for safety, the folder must be inside your home directory' }, 403);
   const found = findRepos(dir, 4);
   const cfg = normalize(readRaw());
   const def = cfg.repoMode === 'only' ? false : true;   // appear with the mode's default
@@ -486,6 +495,7 @@ async function postExtract(req, res) {
     const p = String(body.path).trim().replace(/^~(?=\/)/, os.homedir());
     let st; try { st = fs.statSync(p); } catch { return json(res, { error: 'file not found: ' + p }, 404); }
     if (!st.isFile()) return json(res, { error: 'not a file: ' + p }, 400);
+    if (!insideHome(p)) return json(res, { error: 'for safety, the file must be inside your home directory' }, 403);
     inputPath = p;
   } else if (body.contentB64) {
     const b64 = String(body.contentB64);
