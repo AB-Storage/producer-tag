@@ -2,11 +2,14 @@
   "name": "producer-tag",
   "version": "1.0.0",
   "description": "Play your signature \"producer tag\" sound every time you commit or push to git. Record a library of tags, autotune them, and pick which one drops.",
+  "main": "electron/main.js",
   "bin": {
     "producer-tag": "server.js"
   },
   "scripts": {
     "start": "node server.js",
+    "app": "electron .",
+    "dist": "electron-builder",
     "install-hooks": "bash install.sh"
   },
   "keywords": [
@@ -28,8 +31,38 @@
     "server.js",
     "public/",
     "hooks/",
+    "electron/",
     "install.sh",
     "CLAUDE.md",
     "AGENTS.md"
-  ]
+  ],
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.unemployedarvin.producertag",
+    "productName": "Producer Tag",
+    "files": [
+      "server.js",
+      "public/**/*",
+      "hooks/**/*",
+      "install.sh",
+      "electron/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Development"
+    }
+  }
 }

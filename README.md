@@ -44,6 +44,23 @@ repo's own hooks, so anything you already had keeps working.
 Change the port with `PORT=8080 npm start`. Sounds and settings are stored in
 `~/.producer-tag/` (override with `PRODUCER_TAG_HOME`).
 
+## Desktop app
+
+Prefer a real window you can open and close instead of a terminal? There's an
+Electron wrapper:
+
+```bash
+npm install        # one-time — pulls in Electron
+npm run app        # opens the Producer Tag window (Mac / Windows / Linux)
+
+npm run dist       # optional — build an installer (.dmg / .exe / .AppImage) into dist/
+```
+
+The window **is** just the control panel. The git hooks read `~/.producer-tag`
+directly, so **closing the app never stops your tag from firing** — open it only
+when you want to record, edit, or change settings. (Headless? `node server.js`
+still works with zero dependencies.)
+
 ## What you can do
 
 - **Tag library** — keep as many tags as you like; preview, rename, or delete any.
