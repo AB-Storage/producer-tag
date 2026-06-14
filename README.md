@@ -139,7 +139,7 @@ the WebM/Opus that browsers record by default. Uploads accept `wav`, `mp3`,
 
 ## For AI assistants
 
-Handing this repo to Claude Code, Cursor, or another agent to set up? Point it at
+Handing this repo to an AI coding agent to set up? Point it at
 **[AGENTS.md](AGENTS.md)** — a full install/verify/troubleshoot runbook.
 
 ## License

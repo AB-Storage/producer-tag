@@ -1,6 +1,6 @@
 # Producer Tag — Setup Guide for AI Agents
 
-You are an AI assistant (Claude Code, Cursor, etc.) helping a user install **Producer Tag**
+You are an AI coding agent helping a user install **Producer Tag**
 into their environment. Producer Tag plays a recorded sound on their machine every time
 they `git commit` or `git push`. This file is your runbook. Follow it top to bottom.
 
