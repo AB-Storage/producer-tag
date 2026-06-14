@@ -119,6 +119,7 @@ You should hear the active tag and see a new line in the log (and in the control
 | Autotune / editor errors | `ffmpeg` (with `rubberband`) and/or `python3`+`numpy` not found. Install them or skip those features. |
 | Windows: no sound | Run the hooks under **Git Bash** (which ships with Git for Windows); it invokes PowerShell to play WAV. |
 | Want it silent for now | Flip the master switch off in the panel, or `git config --global --unset core.hooksPath`. |
+| Tag plays multiple times when several repos commit/push at once | Expected to be ONE play — a debounce window collapses the burst. Tune `debounceMs` in config (default 2000ms) or set `$PRODUCER_TAG_DEBOUNCE_MS`; 0 disables. |
 
 ## 6. Uninstall
 
@@ -135,7 +136,8 @@ rm -rf ~/.producer-tag                               # removes all tags + settin
 
 All JSON, served at `http://localhost:7777`:
 
-- `GET  /api/config` · `POST /api/config` — `{enabled, volume(0–2), mode:'fixed'|'random', notify, events:{commit,push}, repoMode:'all'|'only'}`
+- `GET  /api/config` · `POST /api/config` — `{enabled, volume(0–2), mode:'fixed'|'random', notify, events:{commit,push}, repoMode:'all'|'only', debounceMs}`
+  - `debounceMs` (default 2000): when several repos commit/push at once, only the FIRST tag plays within this window — so it never overlaps. 0 disables. Also overridable per-invocation via `$PRODUCER_TAG_DEBOUNCE_MS`.
 - `POST /api/sound` — add a tag `{contentB64, ext, name}` (base64 audio; wav/mp3/m4a/aac/aiff/caf)
 - `GET  /api/sound[?id=]` — stream a tag (Range-enabled) · `POST /api/active {id}` · `POST /api/rename {id,name}` · `POST /api/delete {id}` · `POST /api/skip {id,skip}`
 - `POST /api/autotune {id?, style:'subtle'|'hard'|'chipmunk'}` — adds a tuned copy

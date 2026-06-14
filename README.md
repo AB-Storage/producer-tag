@@ -86,6 +86,9 @@ works with zero dependencies.)
   *local* commit/push — it's **not** your GitHub repo list, so a repo shows up once
   you've pushed to it locally (or you add / scan it). Names are local folder names.
 - **Volume** — applied when the tag fires.
+- **No overlapping** — when several repos commit/push at the same moment, only
+  **one** tag plays (a short debounce window collapses the burst). Tunable via
+  `debounceMs` in config (default 2000ms; 0 disables).
 - **Autotune** — detects the tag's pitch, snaps it to the nearest note, and adds
   character. Three styles:
   - **Subtle** — gentle tune + light shimmer.

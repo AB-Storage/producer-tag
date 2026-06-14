@@ -54,6 +54,8 @@ function normalize(raw) {
     events: { commit: !!(raw.events && raw.events.commit), push: raw.events ? !!raw.events.push : true },
     repoMode: raw.repoMode === 'only' ? 'only' : 'all', // 'all' = play everywhere except muted; 'only' = allowlist
     repos: {},                                       // explicit per-repo: { name: true|false }
+    // Debounce window (ms): concurrent commits/pushes within this window play only ONE tag. 0 = off.
+    debounceMs: Math.max(0, Math.min(60000, Number.isFinite(Number(raw.debounceMs)) ? Math.round(Number(raw.debounceMs)) : 2000)),
     active: raw.active != null ? String(raw.active) : null,
     tags: [],
   };
@@ -86,7 +88,7 @@ function write(cfg) {
   const a = activeTag(cfg);
   fs.writeFileSync(CFG_FILE, JSON.stringify({
     enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
-    repoMode: cfg.repoMode, repos: cfg.repos,
+    repoMode: cfg.repoMode, repos: cfg.repos, debounceMs: cfg.debounceMs,
     active: cfg.active, sound: a ? a.file : '',
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, file: t.file, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   }, null, 2));
@@ -95,7 +97,7 @@ function pub(cfg) {
   const a = activeTag(cfg);
   return {
     ok: true, enabled: cfg.enabled, volume: cfg.volume, mode: cfg.mode, notify: cfg.notify, events: cfg.events,
-    repoMode: cfg.repoMode, repos: cfg.repos,
+    repoMode: cfg.repoMode, repos: cfg.repos, debounceMs: cfg.debounceMs,
     active: cfg.active, hasSound: !!a, soundSize: a ? a.size : 0,
     tags: cfg.tags.map((t) => ({ id: t.id, name: t.name, ext: t.ext, size: t.size, createdAt: t.createdAt, skipRandom: !!t.skipRandom })),
   };
@@ -112,6 +114,7 @@ async function postConfig(req, res) {
   if (typeof b.notify === 'boolean') cfg.notify = b.notify;
   if (b.repoMode != null) cfg.repoMode = b.repoMode === 'only' ? 'only' : 'all';
   if (b.volume != null) cfg.volume = Math.max(0, Math.min(2, Number(b.volume) || 1.0));
+  if (b.debounceMs != null && Number.isFinite(Number(b.debounceMs))) cfg.debounceMs = Math.max(0, Math.min(60000, Math.round(Number(b.debounceMs))));
   if (b.mode != null) cfg.mode = b.mode === 'random' ? 'random' : 'fixed';
   if (b.events) {
     if (typeof b.events.commit === 'boolean') cfg.events.commit = b.events.commit;
